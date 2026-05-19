@@ -1,0 +1,66 @@
+<section class="auth-page">
+    <div class="auth-hero">
+      <h1>SitApp</h1>
+      <p>
+        Registracija i prijava.
+      </p>
+    </div>
+
+  <div class="auth-card">
+    <div class="tab-row">
+      <button type="button" [class.active]="mode() === 'login'" (click)="switchMode('login')">Prijava</button>
+      <button type="button" [class.active]="mode() === 'register'" (click)="switchMode('register')">Registracija</button>
+    </div>
+
+    <form *ngIf="mode() === 'login'" [formGroup]="loginForm" (ngSubmit)="submitLogin()" class="form-card">
+      <label>
+        Korisničko ime, email ili telefon
+        <input formControlName="identifier">
+      </label>
+      <label>
+        Lozinka
+        <input formControlName="password" type="password" >
+      </label>
+      <button class="primary" type="submit">Uđi u aplikaciju</button>
+      <p class="hint">Ako već imaš nalog, uloguj se; ako ne, registruj novi nalog.</p>
+    </form>
+
+    <form *ngIf="mode() === 'register'" [formGroup]="registerForm" (ngSubmit)="submitRegister()" class="form-card form-grid">
+      <label>
+        Ime
+        <input formControlName="firstName" placeholder="Ime">
+      </label>
+      <label>
+        Prezime
+        <input formControlName="lastName" placeholder="Prezime">
+      </label>
+      <label>
+        Korisničko ime
+        <input formControlName="username" placeholder="korisnik">
+      </label>
+      <label>
+        Email
+        <input formControlName="email" type="email" placeholder="ime@domen.rs">
+      </label>
+      <label>
+        Telefon
+        <input formControlName="phone" placeholder="+381...">
+      </label>
+      <label class="avatar-field">
+        <input #fileInput class="file-input" type="file" accept="image/*" (change)="onFileSelected($event)">
+        <button type="button" class="avatar-button" (click)="fileInput.click()">
+          <img class="avatar-img" [src]="avatarSrc()" alt="avatar">
+          <span class="avatar-plus">+</span>
+        </button>
+        <p class="avatar-hint">Klikni da izabereš profilnu sliku (opciono)</p>
+      </label>
+      <label class="full">
+        Lozinka
+        <input formControlName="password" type="password" placeholder="Najmanje 6 karaktera">
+      </label>
+      <button class="primary full" type="submit">Kreiraj nalog</button>
+    </form>
+
+    <p class="error" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+  </div>
+</section>
