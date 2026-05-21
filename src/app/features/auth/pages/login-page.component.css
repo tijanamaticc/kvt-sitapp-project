@@ -88,7 +88,7 @@
 .primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-strong));
   color: white;
-  box-shadow: 0 16px 30px rgba(43, 130, 243, 0.22);
+  box-shadow: 0 16px 30px rgba(18, 140, 126, 0.2);
 }
 
 .tab-row button:hover,
@@ -139,7 +139,7 @@ input, textarea {
   width: 84px;
   height: 84px;
   border-radius: 999px;
-  border: 2px dashed rgba(90,167,255,0.28);
+  border: 2px dashed rgba(37, 211, 102, 0.28);
   display: inline-grid;
   place-items: center;
   background: white;
@@ -178,8 +178,8 @@ input, textarea {
 }
 
 input:focus, textarea:focus {
-  border-color: rgba(90, 167, 255, 0.68);
-  box-shadow: 0 0 0 4px rgba(90, 167, 255, 0.12);
+  border-color: rgba(37, 211, 102, 0.68);
+  box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.12);
 }
 
 .hint,

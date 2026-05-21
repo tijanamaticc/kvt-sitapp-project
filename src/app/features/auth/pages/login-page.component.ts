@@ -18,6 +18,7 @@ export class LoginPageComponent {
 
   readonly mode = signal<'login' | 'register'>('login');
   readonly errorMessage = signal('');
+  readonly infoMessage = signal('');
   readonly isLoggedIn = computed(() => this.auth.isAuthenticated());
 
   readonly loginForm = this.fb.nonNullable.group({
@@ -49,13 +50,14 @@ export class LoginPageComponent {
 
   async submitLogin(): Promise<void> {
     this.errorMessage.set('');
+    this.infoMessage.set('');
     const result = await this.auth.login(this.loginForm.value.identifier ?? '', this.loginForm.value.password ?? '');
     if (!result) {
-      this.errorMessage.set('Netačan identifikator ili lozinka.');
+      this.errorMessage.set(this.auth.lastAuthMessage() || 'Netačan identifikator ili lozinka.');
       return;
     }
 
-    this.router.navigateByUrl('/chat');
+    this.router.navigateByUrl(result.role === 'admin' ? '/admin' : '/chat');
   }
 
   async submitRegister(): Promise<void> {
@@ -78,7 +80,8 @@ export class LoginPageComponent {
     }, this.selectedFile());
 
     if (user) {
-      this.router.navigateByUrl('/chat');
+      this.mode.set('login');
+      this.infoMessage.set('Zahtev za registraciju je poslat administratoru. Nakon odobrenja dobijaš mejl i možeš da se prijaviš.');
     }
   }
 
@@ -94,5 +97,4 @@ export class LoginPageComponent {
     reader.readAsDataURL(file);
   }
 
-  // no built-in demo seeding here; the system keeps only an admin predefined in AuthService
 }

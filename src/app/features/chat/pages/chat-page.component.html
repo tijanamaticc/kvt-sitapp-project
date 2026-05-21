@@ -1,17 +1,69 @@
-<section class="chat-shell" *ngIf="currentUser() as user">
-  <main class="chat-panel panel" style="display: grid; place-items: center; padding: 32px; min-height: 70vh;">
-    <div style="max-width: 760px; text-align: center;">
-      <h2 style="margin: 0 0 8px 0; display:flex; gap:12px; align-items:center; justify-content:center;"> 
-        <img [src]="user.profile.avatarUrl || defaultAvatar" alt="avatar" style="width:56px;height:56px;border-radius:999px;object-fit:cover;margin-right:8px;"> 
-        Uspešno ste prijavljeni
-      </h2>
-      <p style="margin: 0 0 16px 0; color: var(--muted);">
-        Dobrodošli, {{ user.profile.displayName }}. Ovo je kostur aplikacije za prvi push: registracija + prijava/odjava.
-      </p>
-      <p style="margin: 0 0 20px 0; color: var(--muted);">
-        Sledeći korak može biti dodavanje poruka, razgovora i grupa.
-      </p>
-      <button class="primary" type="button" (click)="logout()">Odjava</button>
+<section class="profile-shell" *ngIf="currentUser() as user">
+  <header class="panel profile-top">
+    <div class="row">
+      <div class="brand-copy">
+        <p class="eyebrow">SitApp</p>
+        <h2>Moj profil</h2>
+      </div>
+      <button class="ghost" type="button" (click)="logout()">Odjava</button>
     </div>
+    <div class="profile-hero">
+      <img class="avatar hero" [src]="avatarSrc" alt="profilna">
+      <div>
+        <h3>{{ user.profile.displayName }}</h3>
+        <p>{{ user.username }}</p>
+        <p class="muted">Poslednja aktivnost: {{ user.profile.lastActivityAt ? (user.profile.lastActivityAt | date:'short') : 'nema podataka' }}</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="profile-grid">
+    <section class="panel form-panel">
+      <h3>Upravljanje profilom</h3>
+      <form class="form-card" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+        <div class="grid-2">
+          <label>Ime<input formControlName="firstName"></label>
+          <label>Prezime<input formControlName="lastName"></label>
+          <label>Korisničko ime<input formControlName="username"></label>
+          <label>Email<input type="email" formControlName="email"></label>
+          <label>Telefon<input formControlName="phone"></label>
+          <label>Status<input formControlName="status" placeholder="Dostupan, Na sastanku..."></label>
+        </div>
+        <label>Biografija<textarea rows="3" formControlName="bio" placeholder="Kratko o sebi"></textarea></label>
+        <label class="avatar-field">
+          <input #fileInput class="file-input" type="file" accept="image/*" (change)="onFileSelected($event)">
+          <button type="button" class="avatar-button" (click)="fileInput.click()">
+            <img class="avatar-img" [src]="avatarSrc" alt="avatar">
+            <span class="avatar-plus">+</span>
+          </button>
+          <p class="avatar-hint">Klikni da promeniš profilnu sliku</p>
+        </label>
+        <button class="primary" type="submit">Sačuvaj profil</button>
+        <p class="hint" *ngIf="saveMessage()">{{ saveMessage() }}</p>
+      </form>
+    </section>
+
+    <section class="panel form-panel">
+      <h3>Promena lozinke</h3>
+      <form class="form-card" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+        <label>Trenutna lozinka<input type="password" formControlName="currentPassword"></label>
+        <label>Nova lozinka<input type="password" formControlName="newPassword"></label>
+        <label>Ponovi novu lozinku<input type="password" formControlName="confirmPassword"></label>
+        <button class="primary" type="submit">Promeni lozinku</button>
+        <p class="hint" *ngIf="passwordMessage()">{{ passwordMessage() }}</p>
+      </form>
+    </section>
+
+    <section class="panel info-panel">
+      <h3>Tvoji podaci</h3>
+      <div class="info-card">
+        <p><strong>Ime i prezime:</strong> {{ user.profile.displayName }}</p>
+        <p><strong>Username:</strong> {{ user.username }}</p>
+        <p><strong>Email:</strong> {{ user.email }}</p>
+        <p><strong>Telefon:</strong> {{ user.phone }}</p>
+        <p><strong>Status:</strong> {{ user.profile.status || 'Nije postavljen' }}</p>
+        <p><strong>Biografija:</strong> {{ user.profile.bio || 'Nema unete biografije' }}</p>
+      </div>
+    </section>
   </main>
 </section>

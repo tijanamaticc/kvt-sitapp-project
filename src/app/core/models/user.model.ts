@@ -6,7 +6,10 @@ export interface UserProfile {
   status?: string;
   avatarSeed?: string;
   avatarUrl?: string | null;
+  lastActivityAt?: string | null;
 }
+
+export type AccountStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: string;
@@ -15,5 +18,6 @@ export interface User {
   phone: string;
   password: string;
   role: 'student' | 'admin';
+  accountStatus?: AccountStatus;
   profile: UserProfile;
 }

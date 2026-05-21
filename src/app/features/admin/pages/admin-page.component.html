@@ -1,0 +1,51 @@
+<section class="admin-shell" *ngIf="currentUser() as user">
+  <header class="panel admin-top">
+    <div class="row">
+      <div>
+        <p class="eyebrow">SitApp</p>
+        <h2>Odobravanje registracija</h2>
+      </div>
+      <button class="ghost" type="button" (click)="logout()">Odjava</button>
+    </div>
+    <div class="admin-summary">
+      <strong>{{ user.profile.displayName }}</strong>
+    </div>
+  </header>
+
+  <main class="panel admin-panel">
+    <div class="row title-row">
+      <h3>{{ viewAll() ? 'Svi korisnici' : 'Pending registracije' }}</h3>
+      <div style="display:flex;gap:8px;">
+        <button class="ghost" type="button" (click)="load()">Osveži</button>
+
+      </div>
+    </div>
+
+    <p class="hint" *ngIf="message()">{{ message() }}</p>
+    <p class="hint" *ngIf="loading()">Učitavanje...</p>
+
+    <div class="request-list" *ngIf="users().length > 0; else emptyState">
+      <article class="request-card" *ngFor="let item of users()">
+        <img class="avatar" [src]="getAvatar(item)" alt="avatar">
+        <div class="request-copy">
+          <div class="row">
+            <strong>{{ item.profile.displayName }}</strong>
+            <span class="pill">{{ item.accountStatus || 'approved' }}</span>
+          </div>
+          <p>{{ item.username }} · {{ item.email }}</p>
+          <p>{{ item.phone }}</p>
+          <p class="muted">{{ item.profile.bio || 'Nema biografije' }}</p>
+        </div>
+        <div class="actions">
+          <button *ngIf="!viewAll()" class="primary" type="button" (click)="approve(item.id)">Odobri</button>
+          <button *ngIf="!viewAll()" class="ghost danger" type="button" (click)="reject(item.id)">Odbij</button>
+          <button *ngIf="viewAll()" class="ghost danger" type="button" (click)="deleteUser(item.id)">Obriši</button>
+        </div>
+      </article>
+    </div>
+
+    <ng-template #emptyState>
+      <div class="empty-state">Nema korisnika za prikaz.</div>
+    </ng-template>
+  </main>
+</section>

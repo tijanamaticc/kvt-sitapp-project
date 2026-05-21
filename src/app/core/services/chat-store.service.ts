@@ -15,12 +15,16 @@ export class ChatStoreService {
   private readonly messagesSignal = signal<Message[]>(this.readMessages());
   private readonly activeConversationIdSignal = signal<string | null>(localStorage.getItem(ACTIVE_CONVERSATION_KEY));
   private readonly searchSignal = signal('');
+  private readonly activityFilterSignal = signal<'all' | 'today' | 'week' | 'month'>('all');
+  private readonly avatarFilterSignal = signal<'all' | 'with-avatar' | 'without-avatar'>('all');
 
   readonly conversations = computed(() => this.sortConversations(this.conversationsSignal()));
   readonly messages = computed(() => this.messagesSignal());
   readonly activeConversationId = computed(() => this.activeConversationIdSignal());
   readonly search = computed(() => this.searchSignal());
   readonly currentUser = computed(() => this.auth.currentUser());
+  readonly activityFilter = computed(() => this.activityFilterSignal());
+  readonly avatarFilter = computed(() => this.avatarFilterSignal());
   readonly activeConversation = computed(() => {
     const conversationId = this.activeConversationIdSignal();
     return this.conversationsSignal().find((conversation) => conversation.id === conversationId) ?? null;
@@ -40,16 +44,49 @@ export class ChatStoreService {
     const currentUser = this.auth.currentUser();
     const userList = this.auth.users().filter((user) => user.id !== currentUser?.id);
 
-    if (!query) {
-      return userList;
-    }
+    return userList
+      .filter((user) => {
+        if (!query) {
+          return true;
+        }
 
-    return userList.filter((user) => {
-      return [user.username, user.email, user.phone, user.profile.displayName]
-        .join(' ')
-        .toLowerCase()
-        .includes(query);
-    });
+        return [user.username, user.email, user.phone, user.profile.displayName, user.profile.firstName, user.profile.lastName]
+          .join(' ')
+          .toLowerCase()
+          .includes(query);
+      })
+      .filter((user) => {
+        const activity = user.profile.lastActivityAt ? new Date(user.profile.lastActivityAt).getTime() : 0;
+        const now = Date.now();
+        if (this.activityFilterSignal() === 'today') {
+          return activity >= now - 1000 * 60 * 60 * 24;
+        }
+        if (this.activityFilterSignal() === 'week') {
+          return activity >= now - 1000 * 60 * 60 * 24 * 7;
+        }
+        if (this.activityFilterSignal() === 'month') {
+          return activity >= now - 1000 * 60 * 60 * 24 * 30;
+        }
+        return true;
+      })
+      .filter((user) => {
+        if (this.avatarFilterSignal() === 'with-avatar') {
+          return !!user.profile.avatarUrl;
+        }
+        if (this.avatarFilterSignal() === 'without-avatar') {
+          return !user.profile.avatarUrl;
+        }
+        return true;
+      })
+      .sort((left, right) => {
+        const leftActivity = left.profile.lastActivityAt ? new Date(left.profile.lastActivityAt).getTime() : 0;
+        const rightActivity = right.profile.lastActivityAt ? new Date(right.profile.lastActivityAt).getTime() : 0;
+        if (rightActivity !== leftActivity) {
+          return rightActivity - leftActivity;
+        }
+
+        return left.profile.displayName.localeCompare(right.profile.displayName);
+      });
   });
   readonly recentSearchResults = computed(() => {
     const query = this.searchSignal().trim().toLowerCase();
@@ -101,6 +138,14 @@ export class ChatStoreService {
 
   setSearch(query: string): void {
     this.searchSignal.set(query);
+  }
+
+  setActivityFilter(filter: 'all' | 'today' | 'week' | 'month'): void {
+    this.activityFilterSignal.set(filter);
+  }
+
+  setAvatarFilter(filter: 'all' | 'with-avatar' | 'without-avatar'): void {
+    this.avatarFilterSignal.set(filter);
   }
 
   setActiveConversation(conversationId: string): void {

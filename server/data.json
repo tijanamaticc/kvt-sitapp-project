@@ -1,19 +1,56 @@
 {
   "users": [
     {
-      "id": "0ca8f449-7767-4137-9c33-f664176579e4",
-      "username": "t",
-      "email": "t@gmail.com",
-      "phone": "+381678432",
+      "id": "2258ffec-3c71-4f3c-8b2b-56f52038a51f",
+      "username": "a",
+      "email": "tijanamtc.7@gmail.com",
+      "phone": "+3817653456",
       "password": "123456",
       "role": "student",
+      "accountStatus": "pending",
       "profile": {
-        "firstName": "t",
-        "lastName": "t",
-        "displayName": "t t",
+        "firstName": "a",
+        "lastName": "a",
+        "displayName": "a a",
         "bio": "",
         "status": "",
-        "avatarUrl": "/uploads/0fd1dd78-ce61-43ca-b213-6aebfbfdf9bd.png"
+        "avatarUrl": "/uploads/537c4905-779d-491e-af98-8851858e847f.png"
+      }
+    },
+    {
+      "id": "ed5da0ba-dcdb-4010-8a0a-c26fa6d3eced",
+      "username": "tijanam",
+      "email": "tijanamtc.7@gmail.com",
+      "phone": "+3817653456",
+      "password": "1234567",
+      "role": "student",
+      "accountStatus": "approved",
+      "profile": {
+        "firstName": "Tijana",
+        "lastName": "Matic",
+        "displayName": "Tijana Matic",
+        "bio": "komunikativna",
+        "status": "Dostupna",
+        "avatarUrl": "http://localhost:3333/uploads/13a3d68f-a7fc-4451-87cf-cb270fb049e3.png",
+        "lastActivityAt": "2026-05-21T18:19:01.791Z"
+      }
+    },
+    {
+      "id": "71c8cc9e-9c8e-4d29-bce6-15817054cf75",
+      "username": "live_test2",
+      "email": "tijanamtc.7@gmail.com",
+      "phone": "+381600000011",
+      "password": "livepass2",
+      "role": "student",
+      "accountStatus": "approved",
+      "profile": {
+        "firstName": "Live",
+        "lastName": "Test",
+        "displayName": "Live Test 2",
+        "bio": "",
+        "status": "",
+        "avatarUrl": null,
+        "lastActivityAt": "2026-05-21T18:03:11.295Z"
       }
     },
     {
@@ -24,11 +61,33 @@
       "password": "admin123",
       "role": "admin",
       "profile": {
+        "firstName": "System",
+        "lastName": "Admin",
         "displayName": "Administrator",
         "bio": "Predefinisani administratorski nalog",
         "status": "Online",
-        "avatarUrl": null
-      }
+        "avatarUrl": null,
+        "lastActivityAt": "2026-05-20T19:14:31.097Z"
+      },
+      "accountStatus": "approved"
+    },
+    {
+      "id": "u-test-1",
+      "username": "testuser",
+      "email": "testuser@example.com",
+      "phone": "+381651234567",
+      "password": "test123",
+      "role": "student",
+      "profile": {
+        "firstName": "Test",
+        "lastName": "User",
+        "displayName": "Test User",
+        "bio": "Privremeni test nalog",
+        "status": "Offline",
+        "avatarUrl": null,
+        "lastActivityAt": "2026-05-20T21:58:23.895Z"
+      },
+      "accountStatus": "approved"
     }
   ],
   "conversations": [],

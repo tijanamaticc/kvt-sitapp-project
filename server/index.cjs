@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const uuidv4 = () => crypto.randomUUID();
 
 // Ensure uploads directory exists
@@ -23,6 +25,46 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 const DATA_FILE = path.join(__dirname, 'data.json');
+
+function getMailTransport() {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: String(process.env.SMTP_SECURE || 'false') === 'true',
+    auth: { user, pass }
+  });
+}
+
+async function sendMail(to, subject, text) {
+  const transport = getMailTransport();
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+
+  if (!transport || !from) {
+    console.log('[MAIL MOCK]', { to, subject, text });
+    return;
+  }
+
+  const info = await transport.sendMail({ from, to, subject, text });
+  console.log('Mail sent:', { to, subject, messageId: info.messageId });
+}
+
+function sanitizeUser(user) {
+  const { password: _p, ...safe } = user;
+  return safe;
+}
+
+function findUserById(data, id) {
+  return data.users.find(u => u.id === id);
+}
 
 function readData() {
   try {
@@ -50,13 +92,19 @@ app.post('/api/login', (req, res) => {
   const id = (identifier || '').toString().toLowerCase();
   const user = data.users.find(u => [u.username, u.email, u.phone].map(v => (v || '').toLowerCase()).includes(id) && u.password === password);
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-  const { password: _p, ...safe } = user;
-  res.json(safe);
+  if (user.accountStatus === 'pending') {
+    return res.status(403).json({ error: 'Registration is waiting for admin approval' });
+  }
+  if (user.accountStatus === 'rejected') {
+    return res.status(403).json({ error: 'Registration was rejected by admin' });
+  }
+  res.json(sanitizeUser(user));
 });
 
 app.post('/api/register', upload.single('avatar'), (req, res) => {
   const body = req.body || {};
   const file = req.file;
+  console.log('POST /api/register content-type=', req.headers['content-type']);
 
   // profile may be sent as JSON string when using FormData
   let profile = {};
@@ -72,6 +120,7 @@ app.post('/api/register', upload.single('avatar'), (req, res) => {
     phone: body.phone,
     password: body.password,
     role: 'student',
+    accountStatus: 'pending',
     profile: {
       firstName: profile.firstName || '',
       lastName: profile.lastName || '',
@@ -83,8 +132,158 @@ app.post('/api/register', upload.single('avatar'), (req, res) => {
   };
   data.users.unshift(user);
   writeData(data);
-  const { password: _p, ...safe } = user;
-  res.json(safe);
+  sendMail(
+    user.email,
+    'SitApp - zahtev za registraciju primljen',
+    `Pozdrav ${user.profile.displayName},\n\nTvoj zahtev za registraciju je primljen i čeka odobrenje administratora. Nakon odobrenja dobijaš obaveštenje mejlom.\n\nSitApp`
+  ).catch((error) => console.error('Mail error:', error.message));
+  res.status(201).json(sanitizeUser(user));
+});
+
+// Accept JSON registrations (fallback for clients that POST JSON)
+app.post('/api/register-json', (req, res) => {
+  const body = req.body || {};
+  const data = readData();
+  const user = {
+    id: uuidv4(),
+    username: body.username,
+    email: body.email,
+    phone: body.phone,
+    password: body.password,
+    role: 'student',
+    accountStatus: 'pending',
+    profile: {
+      firstName: (body.profile && body.profile.firstName) || '',
+      lastName: (body.profile && body.profile.lastName) || '',
+      displayName: (body.profile && body.profile.displayName) || body.username,
+      bio: (body.profile && body.profile.bio) || '',
+      status: (body.profile && body.profile.status) || '',
+      avatarUrl: (body.profile && body.profile.avatarUrl) || null
+    }
+  };
+  data.users.unshift(user);
+  writeData(data);
+
+  sendMail(
+    user.email,
+    'SitApp - zahtev za registraciju primljen',
+    `Pozdrav ${user.profile.displayName},\n\nTvoj zahtev za registraciju je primljen i čeka odobrenje administratora. Nakon odobrenja dobijaš obaveštenje mejlom.\n\nSitApp`
+  ).catch((error) => console.error('Mail error:', error.message));
+
+  res.status(201).json(sanitizeUser(user));
+});
+
+app.get('/api/registrations', (req, res) => {
+  const data = readData();
+  const status = (req.query.status || 'pending').toString();
+  const users = status === 'all' ? data.users : data.users.filter((user) => user.accountStatus === status || (status === 'pending' && !user.accountStatus));
+  res.json(users.map(sanitizeUser));
+});
+
+// Admin: list all users
+app.get('/api/users', (req, res) => {
+  const data = readData();
+  res.json(data.users.map(sanitizeUser));
+});
+
+// Admin: delete user
+app.delete('/api/users/:id', (req, res) => {
+  const data = readData();
+  const idx = data.users.findIndex(u => u.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'User not found' });
+  const removed = data.users.splice(idx, 1)[0];
+  writeData(data);
+  res.json(sanitizeUser(removed));
+});
+
+app.post('/api/registrations/:id/approve', async (req, res) => {
+  const data = readData();
+  const user = findUserById(data, req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  user.accountStatus = 'approved';
+  user.profile.lastActivityAt = new Date().toISOString();
+  writeData(data);
+
+  sendMail(
+    user.email,
+    'SitApp - registracija odobrena',
+    `Pozdrav ${user.profile.displayName},\n\nAdministrator je odobrio tvoju registraciju. Sada možeš da se prijaviš u sistem.\n\nSitApp`
+  ).catch((error) => console.error('Mail error:', error.message));
+
+  res.json(sanitizeUser(user));
+});
+
+app.post('/api/registrations/:id/reject', async (req, res) => {
+  const data = readData();
+  const user = findUserById(data, req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  user.accountStatus = 'rejected';
+  user.profile.lastActivityAt = new Date().toISOString();
+  writeData(data);
+
+  sendMail(
+    user.email,
+    'SitApp - registracija odbijena',
+    `Pozdrav ${user.profile.displayName},\n\nNažalost, administrator je odbio tvoj zahtev za registraciju.\n\nSitApp`
+  ).catch((error) => console.error('Mail error:', error.message));
+
+  res.json(sanitizeUser(user));
+});
+
+app.put('/api/users/:id/profile', (req, res) => {
+  const data = readData();
+  const user = findUserById(data, req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const body = req.body || {};
+  user.username = body.username || user.username;
+  user.email = body.email || user.email;
+  user.phone = body.phone || user.phone;
+  user.profile = {
+    ...user.profile,
+    firstName: body.firstName || user.profile.firstName || '',
+    lastName: body.lastName || user.profile.lastName || '',
+    displayName: body.displayName || user.profile.displayName,
+    bio: body.bio || '',
+    status: body.status || '',
+    avatarUrl: body.avatarUrl ?? user.profile.avatarUrl,
+    lastActivityAt: new Date().toISOString()
+  };
+  writeData(data);
+  res.json(sanitizeUser(user));
+});
+
+app.put('/api/users/:id/password', async (req, res) => {
+  const data = readData();
+  const user = findUserById(data, req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword || user.password !== currentPassword) {
+    return res.status(400).json({ error: 'Invalid password data' });
+  }
+
+  user.password = newPassword;
+  user.profile.lastActivityAt = new Date().toISOString();
+  writeData(data);
+
+  sendMail(
+    user.email,
+    'SitApp - lozinka je promenjena',
+    `Pozdrav ${user.profile.displayName},\n\nTvoja lozinka je uspešno promenjena. Ako nisi ti izvršio ovu promenu, odmah se obrati administratoru.\n\nSitApp`
+  ).catch((error) => console.error('Mail error:', error.message));
+
+  res.json(sanitizeUser(user));
 });
 
 app.get('/api/conversations', (req, res) => {
@@ -145,4 +344,16 @@ app.post('/api/conversations/:id/messages', (req, res) => {
 });
 
 const port = process.env.PORT || 3333;
-app.listen(port, () => console.log(`SitApp SVT running on http://localhost:${port}`));
+const server = app.listen(port, () => console.log(`SitApp SVT running on http://localhost:${port}`));
+
+// Verify SMTP transport at startup (no sensitive values printed)
+const transport = getMailTransport();
+if (transport) {
+  transport.verify()
+    .then(() => console.log('SMTP transport: verified (ready to send).'))
+    .catch((err) => console.error('SMTP transport verify failed:', err.message));
+} else {
+  console.log('SMTP transport: not configured, using mock mail (console logs).');
+}
+
+module.exports = server;

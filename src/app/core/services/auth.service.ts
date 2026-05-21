@@ -12,6 +12,7 @@ export class AuthService {
   readonly users = computed(() => this.usersSignal());
   readonly currentUser = computed(() => this.currentUserSignal());
   readonly isAuthenticated = computed(() => this.currentUserSignal() !== null);
+  readonly lastAuthMessage = signal('');
 
   private readonly defaultAdmin: User = {
     id: 'u-admin',
@@ -24,7 +25,8 @@ export class AuthService {
       firstName: 'System',
       lastName: 'Admin',
       displayName: 'Administrator',
-      avatarUrl: null
+      avatarUrl: null,
+      lastActivityAt: new Date().toISOString()
     }
   };
 
@@ -54,7 +56,8 @@ export class AuthService {
     });
   }
 
-  private static readonly SERVER_ORIGIN = 'http://localhost:3333';
+  // Exposed for use by other modules/components that need the server URL
+  static readonly SERVER_ORIGIN = 'http://localhost:3333';
 
   private normalizeUserAvatar(user: User): User {
     if (user && user.profile && user.profile.avatarUrl) {
@@ -66,14 +69,25 @@ export class AuthService {
     return user;
   }
 
+  private touchUserActivity(user: User): User {
+    return {
+      ...user,
+      profile: {
+        ...user.profile,
+        lastActivityAt: new Date().toISOString()
+      }
+    };
+  }
+
   // Ensure a predefined administrator exists (required by KVT)
   bootstrap(adminUser?: User): void {
     if (this.usersSignal().length === 0 && adminUser) {
-      this.usersSignal.set([adminUser]);
+      this.usersSignal.set([this.touchUserActivity(adminUser)]);
     }
   }
 
   async login(identifier: string, password: string): Promise<User | null> {
+    this.lastAuthMessage.set('');
     const normalized = identifier.trim();
 
     // Try server login first
@@ -85,10 +99,16 @@ export class AuthService {
       });
 
       if (res.ok) {
-        const user = this.normalizeUserAvatar((await res.json()) as User);
-        this.usersSignal.update((users) => [user, ...users.filter(u => u.id !== user.id)]);
+        const user = this.touchUserActivity(this.normalizeUserAvatar((await res.json()) as User));
+        this.usersSignal.update((users) => [user, ...users.filter((u) => u.id !== user.id)]);
         this.currentUserSignal.set(user);
         return user;
+      }
+
+      if (res.status === 403) {
+        const payload = await res.json().catch(() => ({}));
+        this.lastAuthMessage.set(payload?.error || 'Nalog nije odobren.');
+        return null;
       }
     } catch (e) {
       // server not reachable, fall back to local
@@ -101,10 +121,20 @@ export class AuthService {
         .includes(lower) && candidate.password === password;
     });
 
-    if (!user) return null;
+    if (!user) {
+      this.lastAuthMessage.set('Netačan identifikator ili lozinka.');
+      return null;
+    }
 
-    this.currentUserSignal.set(user);
-    return user;
+    if ((user.accountStatus || 'approved') !== 'approved' && user.role !== 'admin') {
+      this.lastAuthMessage.set('Nalog čeka odobrenje administratora.');
+      return null;
+    }
+
+    const nextUser = this.touchUserActivity(user);
+    this.usersSignal.update((users) => [nextUser, ...users.filter((candidate) => candidate.id !== nextUser.id)]);
+    this.currentUserSignal.set(nextUser);
+    return nextUser;
   }
 
   async register(payload: Pick<User, 'username' | 'email' | 'phone' | 'password' | 'profile'>, avatarFile?: File | null): Promise<User> {
@@ -126,9 +156,8 @@ export class AuthService {
       });
 
       if (res.ok) {
-        const user = (await res.json()) as User;
-        this.usersSignal.update((users) => [user, ...users]);
-        this.currentUserSignal.set(user);
+        const user = this.touchUserActivity((await res.json()) as User);
+        this.usersSignal.update((users) => [user, ...users.filter((candidate) => candidate.id !== user.id)]);
         return user;
       }
     } catch (e) {
@@ -139,17 +168,210 @@ export class AuthService {
     const user: User = {
       id: crypto.randomUUID(),
       role: 'student',
-      ...payload
+      accountStatus: 'pending',
+      ...payload,
+      profile: {
+        ...payload.profile,
+        lastActivityAt: new Date().toISOString()
+      }
     };
 
     this.usersSignal.update((users) => [user, ...users]);
-    this.currentUserSignal.set(user);
+    
+    // Try to sync the pending registration to server in background using FormData
+    (async () => {
+      try {
+        const form = new FormData();
+        form.append('username', user.username ?? '');
+        form.append('email', user.email ?? '');
+        form.append('phone', user.phone ?? '');
+        form.append('password', user.password ?? '');
+        try {
+          form.append('profile', JSON.stringify(user.profile || {}));
+        } catch (e) {
+          form.append('profile', '{}');
+        }
+
+        // If an avatar file was provided to the original register() call it will be
+        // supplied via the `avatarFile` parameter in that scope. Append it when present.
+        if (avatarFile) {
+          form.append('avatar', avatarFile, avatarFile.name);
+        }
+
+        const res = await fetch(`${AuthService.SERVER_ORIGIN}/api/register`, {
+          method: 'POST',
+          body: form
+        });
+
+        if (res.ok) {
+          const serverUser = this.touchUserActivity((await res.json()) as User);
+          this.mergeUser(serverUser);
+          return;
+        }
+      } catch (e) {
+        // still offline or server rejected multipart — will try JSON fallback
+      }
+
+      // Try JSON fallback (some environments send JSON instead of multipart)
+      try {
+        const jsonRes = await fetch(`${AuthService.SERVER_ORIGIN}/api/register-json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: user.username,
+            email: user.email,
+            phone: user.phone,
+            password: user.password,
+            profile: user.profile
+          })
+        });
+
+        if (jsonRes.ok) {
+          const serverUser = this.touchUserActivity((await jsonRes.json()) as User);
+          this.mergeUser(serverUser);
+        }
+      } catch (e) {
+        // still offline — leave local pending user
+      }
+    })();
+
     return user;
   }
 
   updateCurrentUser(nextUser: User): void {
-    this.usersSignal.update((users) => users.map((user) => (user.id === nextUser.id ? nextUser : user)));
-    this.currentUserSignal.set(nextUser);
+    const withActivity = this.touchUserActivity(nextUser);
+    this.usersSignal.update((users) => users.map((user) => (user.id === withActivity.id ? withActivity : user)));
+    this.currentUserSignal.set(withActivity);
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
+    const currentUser = this.currentUserSignal();
+    if (!currentUser) return false;
+
+    // If we have a local password (offline/demo users), validate locally first
+    if (currentUser.password && currentUser.password === currentPassword) {
+      const nextUser: User = { ...currentUser, password: newPassword };
+      this.updateCurrentUser(nextUser);
+      // Fire-and-forget server update
+      fetch(`${AuthService.SERVER_ORIGIN}/api/users/${currentUser.id}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword })
+      }).catch(() => undefined);
+      return true;
+    }
+
+    // Otherwise try server-side validation (for users authenticated via backend)
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/users/${currentUser.id}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      if (!response.ok) return false;
+
+      // Update local copy with new password for future local checks
+      const nextUser: User = { ...currentUser, password: newPassword };
+      this.updateCurrentUser(nextUser);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async saveProfileToServer(user: User): Promise<User | null> {
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/users/${user.id}/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          firstName: user.profile.firstName,
+          lastName: user.profile.lastName,
+          displayName: user.profile.displayName,
+          bio: user.profile.bio,
+          status: user.profile.status,
+          avatarUrl: user.profile.avatarUrl
+        })
+      });
+
+      if (response.ok) {
+        return this.normalizeUserAvatar((await response.json()) as User);
+      }
+    } catch (e) {
+      // ignore fallback
+    }
+
+    return null;
+  }
+
+  async fetchPendingRegistrations(): Promise<User[]> {
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/registrations?status=pending`);
+      if (response.ok) {
+        return (await response.json()) as User[];
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    return this.usersSignal().filter((user) => (user.accountStatus || 'approved') === 'pending');
+  }
+
+  async approveRegistration(userId: string): Promise<User | null> {
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/registrations/${userId}/approve`, { method: 'POST' });
+      if (response.ok) {
+        const user = await response.json();
+        this.mergeUser(user as User);
+        return user as User;
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    const user = this.usersSignal().find((item) => item.id === userId);
+    if (!user) {
+      return null;
+    }
+
+    const nextUser = { ...user, accountStatus: 'approved' as const };
+    this.mergeUser(nextUser);
+    return nextUser;
+  }
+
+  async rejectRegistration(userId: string): Promise<User | null> {
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/registrations/${userId}/reject`, { method: 'POST' });
+      if (response.ok) {
+        const user = await response.json();
+        this.mergeUser(user as User);
+        return user as User;
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    const user = this.usersSignal().find((item) => item.id === userId);
+    if (!user) {
+      return null;
+    }
+
+    const nextUser = { ...user, accountStatus: 'rejected' as const };
+    this.mergeUser(nextUser);
+    return nextUser;
+  }
+
+  private mergeUser(nextUser: User): void {
+    const normalized = this.normalizeUserAvatar(this.touchUserActivity(nextUser));
+    this.usersSignal.update((users) => [normalized, ...users.filter((user) => user.id !== normalized.id)]);
+  }
+
+  private isLegacyDemoUser(user: User): boolean {
+    return user.id.startsWith('u-') && user.id !== 'u-admin';
   }
 
   logout(): void {
@@ -158,11 +380,13 @@ export class AuthService {
 
   private readUsers(): User[] {
     const raw = localStorage.getItem(USERS_KEY);
-    return raw ? (JSON.parse(raw) as User[]) : [];
+    const users = raw ? (JSON.parse(raw) as User[]) : [];
+    return users.filter((user) => !this.isLegacyDemoUser(user));
   }
 
   private readSession(): User | null {
     const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
+    const session = raw ? (JSON.parse(raw) as User) : null;
+    return session && !this.isLegacyDemoUser(session) ? session : null;
   }
 }

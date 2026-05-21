@@ -3,3 +3,5 @@ dist/
 .angular/
 .vscode/
 .DS_Store
+#. Local environment variables (do not commit)
+.env
