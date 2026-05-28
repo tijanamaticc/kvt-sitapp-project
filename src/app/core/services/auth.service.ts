@@ -126,6 +126,11 @@ export class AuthService {
       return null;
     }
 
+    if ((user.accountStatus || 'approved') === 'blocked') {
+      this.lastAuthMessage.set(user.blockedReason || 'Nalog je blokiran.');
+      return null;
+    }
+
     if ((user.accountStatus || 'approved') !== 'approved' && user.role !== 'admin') {
       this.lastAuthMessage.set('Nalog čeka odobrenje administratora.');
       return null;
@@ -368,6 +373,108 @@ export class AuthService {
   private mergeUser(nextUser: User): void {
     const normalized = this.normalizeUserAvatar(this.touchUserActivity(nextUser));
     this.usersSignal.update((users) => [normalized, ...users.filter((user) => user.id !== normalized.id)]);
+  }
+
+  async refreshUsersFromServer(): Promise<User[]> {
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/users`);
+      if (response.ok) {
+        const users = (await response.json()) as User[];
+        this.usersSignal.set(users.map((user) => this.normalizeUserAvatar(user)));
+        return this.usersSignal();
+      }
+    } catch (e) {
+      // keep local cache
+    }
+
+    return this.usersSignal();
+  }
+
+  async searchUsers(query = '', activity = 'all', avatar = 'all'): Promise<User[]> {
+    try {
+      const url = new URL(`${AuthService.SERVER_ORIGIN}/api/users/search`);
+      url.searchParams.set('query', query);
+      url.searchParams.set('activity', activity);
+      url.searchParams.set('avatar', avatar);
+      const response = await fetch(url.toString());
+      if (response.ok) {
+        return ((await response.json()) as User[]).map((user) => this.normalizeUserAvatar(user));
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    return this.usersSignal()
+      .filter((user) => {
+        const haystack = [user.username, user.email, user.phone, user.profile.displayName, user.profile.firstName, user.profile.lastName]
+          .join(' ')
+          .toLowerCase();
+        return !query || haystack.includes(query.toLowerCase());
+      })
+      .filter((user) => {
+        const lastActivity = user.profile.lastActivityAt ? new Date(user.profile.lastActivityAt).getTime() : 0;
+        const now = Date.now();
+        if (activity === 'today') return lastActivity >= now - 1000 * 60 * 60 * 24;
+        if (activity === 'week') return lastActivity >= now - 1000 * 60 * 60 * 24 * 7;
+        if (activity === 'month') return lastActivity >= now - 1000 * 60 * 60 * 24 * 30;
+        return true;
+      })
+      .filter((user) => {
+        if (avatar === 'with-avatar') return !!user.profile.avatarUrl;
+        if (avatar === 'without-avatar') return !user.profile.avatarUrl;
+        return true;
+      });
+  }
+
+  async blockUser(userId: string, reason: string, until?: string | null): Promise<User | null> {
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/users/${userId}/block`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, until: until || null })
+      });
+
+      if (response.ok) {
+        const user = (await response.json()) as User;
+        this.mergeUser(user);
+        return user;
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    return null;
+  }
+
+  async unblockUser(userId: string): Promise<User | null> {
+    try {
+      const response = await fetch(`${AuthService.SERVER_ORIGIN}/api/users/${userId}/unblock`, { method: 'POST' });
+      if (response.ok) {
+        const user = (await response.json()) as User;
+        this.mergeUser(user);
+        return user;
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    return null;
+  }
+
+  async fetchAnalytics(from?: string, to?: string): Promise<any | null> {
+    try {
+      const url = new URL(`${AuthService.SERVER_ORIGIN}/api/analytics`);
+      if (from) url.searchParams.set('from', from);
+      if (to) url.searchParams.set('to', to);
+      const response = await fetch(url.toString());
+      if (response.ok) {
+        return response.json();
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    return null;
   }
 
   private isLegacyDemoUser(user: User): boolean {

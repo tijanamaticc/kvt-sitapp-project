@@ -1,6 +1,11 @@
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 export type MessageKind = 'text';
 
+export interface MessageReaction {
+  emoji: string;
+  userIds: string[];
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -9,4 +14,7 @@ export interface Message {
   createdAt: string;
   status: MessageStatus;
   kind: MessageKind;
+  deliveredAt?: string | null;
+  readAt?: string | null;
+  reactions?: MessageReaction[];
 }

@@ -14,14 +14,19 @@ export class ChatStoreService {
   private readonly conversationsSignal = signal<Conversation[]>(this.readConversations());
   private readonly messagesSignal = signal<Message[]>(this.readMessages());
   private readonly activeConversationIdSignal = signal<string | null>(localStorage.getItem(ACTIVE_CONVERSATION_KEY));
-  private readonly searchSignal = signal('');
+  private readonly userSearchSignal = signal('');
+  private readonly conversationSearchSignal = signal('');
+  private readonly messageSearchSignal = signal('');
   private readonly activityFilterSignal = signal<'all' | 'today' | 'week' | 'month'>('all');
   private readonly avatarFilterSignal = signal<'all' | 'with-avatar' | 'without-avatar'>('all');
 
   readonly conversations = computed(() => this.sortConversations(this.conversationsSignal()));
   readonly messages = computed(() => this.messagesSignal());
   readonly activeConversationId = computed(() => this.activeConversationIdSignal());
-  readonly search = computed(() => this.searchSignal());
+  readonly search = computed(() => this.userSearchSignal());
+  readonly userSearch = computed(() => this.userSearchSignal());
+  readonly conversationSearch = computed(() => this.conversationSearchSignal());
+  readonly messageSearch = computed(() => this.messageSearchSignal());
   readonly currentUser = computed(() => this.auth.currentUser());
   readonly activityFilter = computed(() => this.activityFilterSignal());
   readonly avatarFilter = computed(() => this.avatarFilterSignal());
@@ -39,8 +44,41 @@ export class ChatStoreService {
       .filter((message) => message.conversationId === conversationId)
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   });
+  readonly filteredMessages = computed(() => {
+    const query = this.messageSearchSignal().trim().toLowerCase();
+    if (!query) {
+      return this.activeConversationMessages();
+    }
+
+    return this.activeConversationMessages().filter((message) => message.text.toLowerCase().includes(query));
+  });
+  readonly filteredConversations = computed(() => {
+    const query = this.conversationSearchSignal().trim().toLowerCase();
+    const activityFilter = this.activityFilterSignal();
+    return this.sortConversations(
+      this.conversationsSignal().filter((conversation) => {
+        if (query && ![conversation.title, conversation.description].join(' ').toLowerCase().includes(query)) {
+          return false;
+        }
+
+        const activity = conversation.lastActivityAt || conversation.updatedAt || conversation.createdAt;
+        const activityTime = new Date(activity).getTime();
+        const now = Date.now();
+        if (activityFilter === 'today') {
+          return activityTime >= now - 1000 * 60 * 60 * 24;
+        }
+        if (activityFilter === 'week') {
+          return activityTime >= now - 1000 * 60 * 60 * 24 * 7;
+        }
+        if (activityFilter === 'month') {
+          return activityTime >= now - 1000 * 60 * 60 * 24 * 30;
+        }
+        return true;
+      })
+    );
+  });
   readonly filteredUsers = computed(() => {
-    const query = this.searchSignal().trim().toLowerCase();
+    const query = this.userSearchSignal().trim().toLowerCase();
     const currentUser = this.auth.currentUser();
     const userList = this.auth.users().filter((user) => user.id !== currentUser?.id);
 
@@ -89,7 +127,7 @@ export class ChatStoreService {
       });
   });
   readonly recentSearchResults = computed(() => {
-    const query = this.searchSignal().trim().toLowerCase();
+    const query = this.userSearchSignal().trim().toLowerCase();
     if (!query) {
       return [];
     }
@@ -136,8 +174,16 @@ export class ChatStoreService {
     }
   }
 
-  setSearch(query: string): void {
-    this.searchSignal.set(query);
+  setUserSearch(query: string): void {
+    this.userSearchSignal.set(query);
+  }
+
+  setConversationSearch(query: string): void {
+    this.conversationSearchSignal.set(query);
+  }
+
+  setMessageSearch(query: string): void {
+    this.messageSearchSignal.set(query);
   }
 
   setActivityFilter(filter: 'all' | 'today' | 'week' | 'month'): void {
@@ -238,6 +284,10 @@ export class ChatStoreService {
       return;
     }
 
+    if ((currentUser.accountStatus || 'approved') === 'blocked') {
+      return;
+    }
+
     const message: Message = {
       id: crypto.randomUUID(),
       conversationId: conversation.id,
@@ -245,16 +295,64 @@ export class ChatStoreService {
       text: text.trim(),
       createdAt: new Date().toISOString(),
       status: 'sent',
-      kind: 'text'
+      kind: 'text',
+      deliveredAt: null,
+      readAt: null,
+      reactions: []
     };
 
     this.messagesSignal.update((messages) => [...messages, message]);
     this.updateConversationTouch(conversation.id, message.id);
+    this.scheduleDelivery(message.id);
     this.markConversationRead(conversation.id);
+  }
 
-    if (conversation.kind === 'direct') {
-      window.setTimeout(() => this.sendAutoReply(conversation.id), 900);
+  reactToMessage(messageId: string, emoji: string): void {
+    const currentUser = this.requireCurrentUser();
+    this.messagesSignal.update((messages) =>
+      messages.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        const reactions = Array.isArray(message.reactions) ? [...message.reactions] : [];
+        const existing = reactions.find((item) => item.emoji === emoji);
+        if (existing) {
+          if (existing.userIds.includes(currentUser.id)) {
+            existing.userIds = existing.userIds.filter((userId) => userId !== currentUser.id);
+            return { ...message, reactions: reactions.filter((item) => item.userIds.length > 0) };
+          }
+
+          existing.userIds = [...existing.userIds, currentUser.id];
+          return { ...message, reactions };
+        }
+
+        reactions.push({ emoji, userIds: [currentUser.id] });
+        return { ...message, reactions };
+      })
+    );
+  }
+
+  getReactionSummary(message: Message): Array<{ emoji: string; count: number }> {
+    return (message.reactions || [])
+      .map((reaction) => ({ emoji: reaction.emoji, count: reaction.userIds.length }))
+      .filter((reaction) => reaction.count > 0);
+  }
+
+  getMessageStatusIcon(message: Message, currentUserId?: string): string {
+    if (message.senderId !== currentUserId) {
+      return '•';
     }
+
+    if (message.status === 'read') {
+      return '✓✓';
+    }
+
+    if (message.status === 'delivered') {
+      return '✓✓';
+    }
+
+    return '✓';
   }
 
   logout(): void {
@@ -276,37 +374,6 @@ export class ChatStoreService {
     return this.auth.users().find((user) => user.id === userId) ?? null;
   }
 
-  private sendAutoReply(conversationId: string): void {
-    const conversation = this.conversationsSignal().find((item) => item.id === conversationId);
-    const currentUser = this.auth.currentUser();
-    if (!conversation || !currentUser) {
-      return;
-    }
-
-    const partner = this.getConversationPartner(conversation);
-    if (!partner) {
-      return;
-    }
-
-    const replyTemplates = [
-      'Stigla je poruka. Javljam se uskoro.',
-      'Vidim poruku, odgovaram za minut.',
-      'Super, hvala. Nastavljamo razgovor.'
-    ];
-    const reply: Message = {
-      id: crypto.randomUUID(),
-      conversationId,
-      senderId: partner.id,
-      text: replyTemplates[Math.floor(Math.random() * replyTemplates.length)],
-      createdAt: new Date().toISOString(),
-      status: 'read',
-      kind: 'text'
-    };
-
-    this.messagesSignal.update((messages) => [...messages, reply]);
-    this.updateConversationTouch(conversationId, reply.id, 1);
-  }
-
   private markConversationRead(conversationId: string): void {
     const currentUser = this.requireCurrentUser();
     this.conversationsSignal.update((conversations) =>
@@ -318,10 +385,33 @@ export class ChatStoreService {
     this.messagesSignal.update((messages) =>
       messages.map((message) =>
         message.conversationId === conversationId && message.senderId !== currentUser.id
-          ? { ...message, status: 'read' }
+          ? { ...message, status: 'read', readAt: new Date().toISOString(), deliveredAt: message.deliveredAt || new Date().toISOString() }
           : message
       )
     );
+  }
+
+  private markOutgoingAsRead(conversationId: string, readerId: string): void {
+    this.messagesSignal.update((messages) =>
+      messages.map((message) =>
+        message.conversationId === conversationId && message.senderId !== readerId
+          ? { ...message, status: 'read', readAt: new Date().toISOString(), deliveredAt: message.deliveredAt || new Date().toISOString() }
+          : message
+      )
+    );
+  }
+
+  private scheduleDelivery(messageId: string): void {
+    window.setTimeout(() => {
+      const deliveredAt = new Date().toISOString();
+      this.messagesSignal.update((messages) =>
+        messages.map((message) =>
+          message.id === messageId && message.status === 'sent'
+            ? { ...message, status: 'delivered', deliveredAt }
+            : message
+        )
+      );
+    }, 350);
   }
 
   private updateConversationTouch(conversationId: string, messageId: string, unreadDelta = 0): void {
@@ -332,7 +422,8 @@ export class ChatStoreService {
               ...conversation,
               lastMessageId: messageId,
               unreadCount: Math.max(0, conversation.unreadCount + unreadDelta),
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date().toISOString(),
+              lastActivityAt: new Date().toISOString()
             }
           : conversation
       )
@@ -360,7 +451,8 @@ export class ChatStoreService {
           ...conversation,
           title: nextUser.profile.displayName,
           description: nextUser.profile.status ?? '',
-          avatarSeed: nextUser.profile.avatarSeed ?? nextUser.profile.displayName
+          avatarSeed: nextUser.profile.avatarSeed ?? nextUser.profile.displayName,
+          lastActivityAt: conversation.lastActivityAt || conversation.updatedAt
         };
       })
     );
@@ -424,51 +516,10 @@ export class ChatStoreService {
       lastMessageId: null
     };
 
-    const seededMessages: Message[] = [
-      {
-        id: crypto.randomUUID(),
-        conversationId: directConversation.id,
-        senderId: teammate?.id ?? currentUserId,
-        text: 'Hej, proveri novu verziju sitapp layout-a.',
-        createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-        status: 'read',
-        kind: 'text'
-      },
-      {
-        id: crypto.randomUUID(),
-        conversationId: directConversation.id,
-        senderId: currentUserId,
-        text: 'Otvaram sad i doterujem svetlo plavu temu.',
-        createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-        status: 'read',
-        kind: 'text'
-      },
-      {
-        id: crypto.randomUUID(),
-        conversationId: groupConversation.id,
-        senderId: seedUsers.find((user) => user.username === 'marko')?.id ?? currentUserId,
-        text: 'Dodao sam osnovni raspored komponenti.',
-        createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-        status: 'read',
-        kind: 'text'
-      },
-      {
-        id: crypto.randomUUID(),
-        conversationId: groupConversation.id,
-        senderId: seedUsers.find((user) => user.username === 'jelena')?.id ?? currentUserId,
-        text: 'Fali još auth deo i profile panel.',
-        createdAt: new Date(Date.now() - 1000 * 60 * 39).toISOString(),
-        status: 'read',
-        kind: 'text'
-      }
-    ];
-
-    directConversation.lastMessageId = seededMessages[1].id;
-    groupConversation.lastMessageId = seededMessages[3].id;
-
+    // Seed only empty conversations (no historic messages)
     return {
       conversations: [directConversation, groupConversation],
-      messages: seededMessages
+      messages: []
     };
   }
 
@@ -498,5 +549,30 @@ export class ChatStoreService {
   private readMessages(): Message[] {
     const raw = localStorage.getItem(MESSAGES_KEY);
     return raw ? (JSON.parse(raw) as Message[]) : [];
+  }
+
+  /**
+   * Purge all conversations/messages except those limited to the provided usernames.
+   * Keeps only conversations whose memberIds are a subset of the keep users set.
+   */
+  purgeConversationsExcept(keepUsernames: string[]): void {
+    const users = this.auth.users();
+    const keepIds = users.filter((u) => keepUsernames.includes(u.username)).map((u) => u.id);
+
+    // Keep conversations where every member is in keepIds
+    const keptConversations = this.conversationsSignal().filter((conv) => conv.memberIds.every((id) => keepIds.includes(id)));
+
+    const keptConversationIds = new Set(keptConversations.map((c) => c.id));
+
+    const keptMessages = this.messagesSignal().filter((m) => keptConversationIds.has(m.conversationId));
+
+    this.conversationsSignal.set(keptConversations);
+    this.messagesSignal.set(keptMessages);
+    // active conversation fallback
+    if (this.conversationsSignal().length === 0) {
+      this.activeConversationIdSignal.set(null);
+    } else if (!this.activeConversationIdSignal() || !keptConversationIds.has(this.activeConversationIdSignal()!)) {
+      this.activeConversationIdSignal.set(this.conversationsSignal()[0].id);
+    }
   }
 }

@@ -1,0 +1,66 @@
+<section class="profile-layout" *ngIf="currentUser() as user">
+  <header class="profile-head">
+    <div>
+      <p class="eyebrow">Profil</p>
+      <h2>Moj profil</h2>
+      <p>Ovde menjaš podatke, avatar i lozinku.</p>
+    </div>
+    <div class="profile-card">
+      <img class="profile-avatar" [src]="avatarSrc" alt="profilna">
+      <div>
+        <strong>{{ user.profile.displayName }}</strong>
+        <p>{{ user.username }}</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="profile-grid">
+    <section class="panel">
+      <h3>Upravljanje profilom</h3>
+      <form class="form-card" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+        <div class="grid-2">
+          <label>Ime<input formControlName="firstName"></label>
+          <label>Prezime<input formControlName="lastName"></label>
+          <label>Korisničko ime<input formControlName="username"></label>
+          <label>Email<input type="email" formControlName="email"></label>
+          <label>Telefon<input formControlName="phone"></label>
+          <label>Status<input formControlName="status" placeholder="Dostupan, Na sastanku..."></label>
+        </div>
+        <label>Biografija<textarea rows="3" formControlName="bio" placeholder="Kratko o sebi"></textarea></label>
+        <label class="avatar-field">
+          <input #fileInput class="file-input" type="file" accept="image/*" (change)="onFileSelected($event)">
+          <button type="button" class="avatar-button" (click)="fileInput.click()">
+            <img class="avatar-img" [src]="avatarSrc" alt="avatar">
+            <span class="avatar-plus">+</span>
+          </button>
+          <p class="avatar-hint">Klikni da promeniš profilnu sliku</p>
+        </label>
+        <button class="primary" type="submit">Sačuvaj profil</button>
+        <p class="hint" *ngIf="saveMessage()">{{ saveMessage() }}</p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h3>Promena lozinke</h3>
+      <form class="form-card" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+        <label>Trenutna lozinka<input type="password" formControlName="currentPassword"></label>
+        <label>Nova lozinka<input type="password" formControlName="newPassword"></label>
+        <label>Ponovi novu lozinku<input type="password" formControlName="confirmPassword"></label>
+        <button class="primary" type="submit">Promeni lozinku</button>
+        <p class="hint" *ngIf="passwordMessage()">{{ passwordMessage() }}</p>
+      </form>
+    </section>
+
+    <section class="panel info-panel">
+      <h3>Tvoji podaci</h3>
+      <div class="info-card">
+        <p><strong>Ime i prezime:</strong> {{ user.profile.displayName }}</p>
+        <p><strong>Username:</strong> {{ user.username }}</p>
+        <p><strong>Email:</strong> {{ user.email }}</p>
+        <p><strong>Telefon:</strong> {{ user.phone }}</p>
+        <p><strong>Status:</strong> {{ user.profile.status || 'Nije postavljen' }}</p>
+        <p><strong>Biografija:</strong> {{ user.profile.bio || 'Nema unete biografije' }}</p>
+      </div>
+    </section>
+  </div>
+</section>

@@ -1,0 +1,48 @@
+<section class="shell-layout" *ngIf="currentUser() as user">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-badge" aria-hidden="true">
+        <svg width="36" height="36" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" role="img">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#4fb3ff"/>
+              <stop offset="100%" stop-color="#2b8ee6"/>
+            </linearGradient>
+          </defs>
+          <rect width="48" height="48" rx="10" fill="url(#g1)" />
+          <text x="50%" y="56%" text-anchor="middle" font-family="Inter, sans-serif" font-weight="800" font-size="22" fill="#fff">S</text>
+        </svg>
+      </div>
+      <div>
+        <strong>SitApp</strong>
+        <p>Poruke i kontakti</p>
+      </div>
+    </div>
+
+    <div class="sidebar-user">
+      <img [src]="getUserAvatar()" alt="profilna" class="sidebar-avatar">
+      <div>
+        <strong>{{ user.profile.displayName }}</strong>
+        <p>{{ user.profile.status || 'Online' }}</p>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a routerLink="/chat/messages" routerLinkActive="active">
+        <span>Čat</span>
+      </a>
+      <a routerLink="/chat/contacts" routerLinkActive="active">
+        <span>Kontakti</span>
+      </a>
+      <a routerLink="/chat/profile" routerLinkActive="active">
+        <span>Profil</span>
+      </a>
+    </nav>
+
+    <button class="logout-btn" type="button" (click)="logout()">Odjava</button>
+  </aside>
+
+  <main class="chat-content">
+    <router-outlet></router-outlet>
+  </main>
+</section>

@@ -62,6 +62,19 @@ function sanitizeUser(user) {
   return safe;
 }
 
+function isBlocked(user) {
+  return user.accountStatus === 'blocked';
+}
+
+function normalizeUserFlags(user) {
+  return {
+    ...user,
+    blockedAt: user.blockedAt || null,
+    blockedUntil: user.blockedUntil || null,
+    blockedReason: user.blockedReason || null
+  };
+}
+
 function findUserById(data, id) {
   return data.users.find(u => u.id === id);
 }
@@ -92,6 +105,9 @@ app.post('/api/login', (req, res) => {
   const id = (identifier || '').toString().toLowerCase();
   const user = data.users.find(u => [u.username, u.email, u.phone].map(v => (v || '').toLowerCase()).includes(id) && u.password === password);
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+  if (isBlocked(user)) {
+    return res.status(403).json({ error: user.blockedReason || 'Nalog je blokiran' });
+  }
   if (user.accountStatus === 'pending') {
     return res.status(403).json({ error: 'Registration is waiting for admin approval' });
   }
@@ -183,7 +199,63 @@ app.get('/api/registrations', (req, res) => {
 // Admin: list all users
 app.get('/api/users', (req, res) => {
   const data = readData();
-  res.json(data.users.map(sanitizeUser));
+  res.json(data.users.map((user) => sanitizeUser(normalizeUserFlags(user))));
+});
+
+app.get('/api/users/search', (req, res) => {
+  const data = readData();
+  const query = (req.query.query || '').toString().trim().toLowerCase();
+  const activity = (req.query.activity || 'all').toString();
+  const avatar = (req.query.avatar || 'all').toString();
+  const users = data.users.filter((user) => {
+    const haystack = [user.username, user.email, user.phone, user.profile?.firstName, user.profile?.lastName, user.profile?.displayName]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    if (query && !haystack.includes(query)) return false;
+
+    const lastActivity = user.profile?.lastActivityAt ? new Date(user.profile.lastActivityAt).getTime() : 0;
+    const now = Date.now();
+    if (activity === 'today' && lastActivity < now - 1000 * 60 * 60 * 24) return false;
+    if (activity === 'week' && lastActivity < now - 1000 * 60 * 60 * 24 * 7) return false;
+    if (activity === 'month' && lastActivity < now - 1000 * 60 * 60 * 24 * 30) return false;
+
+    if (avatar === 'with-avatar' && !user.profile?.avatarUrl) return false;
+    if (avatar === 'without-avatar' && user.profile?.avatarUrl) return false;
+    return true;
+  });
+  res.json(users.map((user) => sanitizeUser(normalizeUserFlags(user))));
+});
+
+app.post('/api/users/:id/block', (req, res) => {
+  const data = readData();
+  const user = findUserById(data, req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const { reason, until } = req.body || {};
+  user.accountStatus = 'blocked';
+  user.blockedAt = new Date().toISOString();
+  user.blockedReason = reason || 'Blokiran od strane administratora';
+  user.blockedUntil = until || null;
+  writeData(data);
+  res.json(sanitizeUser(normalizeUserFlags(user)));
+});
+
+app.post('/api/users/:id/unblock', (req, res) => {
+  const data = readData();
+  const user = findUserById(data, req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  user.accountStatus = 'approved';
+  user.blockedAt = null;
+  user.blockedUntil = null;
+  user.blockedReason = null;
+  writeData(data);
+  res.json(sanitizeUser(normalizeUserFlags(user)));
 });
 
 // Admin: delete user
@@ -291,6 +363,15 @@ app.get('/api/conversations', (req, res) => {
   res.json(data.conversations);
 });
 
+app.get('/api/conversations/:id', (req, res) => {
+  const data = readData();
+  const conversation = data.conversations.find((item) => item.id === req.params.id);
+  if (!conversation) {
+    return res.status(404).json({ error: 'Conversation not found' });
+  }
+  res.json(conversation);
+});
+
 app.post('/api/conversations', (req, res) => {
   const { title, memberIds, description, kind } = req.body;
   const data = readData();
@@ -330,7 +411,10 @@ app.post('/api/conversations/:id/messages', (req, res) => {
     text: text || '',
     createdAt: new Date().toISOString(),
     status: 'sent',
-    kind: kind || 'text'
+    kind: kind || 'text',
+    deliveredAt: new Date().toISOString(),
+    readAt: null,
+    reactions: []
   };
   data.messages.push(message);
   const conv = data.conversations.find(c => c.id === id);
@@ -338,9 +422,106 @@ app.post('/api/conversations/:id/messages', (req, res) => {
     conv.lastMessageId = message.id;
     conv.updatedAt = new Date().toISOString();
     conv.unreadCount = (conv.unreadCount || 0) + 1;
+    conv.lastActivityAt = message.createdAt;
   }
   writeData(data);
   res.json(message);
+});
+
+app.post('/api/messages/:id/read', (req, res) => {
+  const data = readData();
+  const message = data.messages.find((item) => item.id === req.params.id);
+  if (!message) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  message.status = 'read';
+  message.readAt = new Date().toISOString();
+  writeData(data);
+  res.json(message);
+});
+
+app.post('/api/messages/:id/reactions', (req, res) => {
+  const data = readData();
+  const message = data.messages.find((item) => item.id === req.params.id);
+  if (!message) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  const { emoji, userId } = req.body || {};
+  if (!emoji || !userId) {
+    return res.status(400).json({ error: 'Missing reaction payload' });
+  }
+
+  message.reactions = Array.isArray(message.reactions) ? message.reactions : [];
+  const existing = message.reactions.find((item) => item.emoji === emoji);
+  if (existing) {
+    if (!existing.userIds.includes(userId)) {
+      existing.userIds.push(userId);
+    } else {
+      existing.userIds = existing.userIds.filter((item) => item !== userId);
+      if (existing.userIds.length === 0) {
+        message.reactions = message.reactions.filter((item) => item.emoji !== emoji);
+      }
+    }
+  } else {
+    message.reactions.push({ emoji, userIds: [userId] });
+  }
+
+  writeData(data);
+  res.json(message);
+});
+
+app.get('/api/analytics', (req, res) => {
+  const data = readData();
+  const from = req.query.from ? new Date(req.query.from.toString()) : new Date(0);
+  const to = req.query.to ? new Date(req.query.to.toString()) : new Date();
+  const fromTime = Number.isNaN(from.getTime()) ? 0 : from.getTime();
+  const toTime = Number.isNaN(to.getTime()) ? Date.now() : to.getTime();
+
+  const users = data.users.filter((user) => {
+    const created = user.profile?.lastActivityAt ? new Date(user.profile.lastActivityAt).getTime() : 0;
+    return created >= fromTime && created <= toTime;
+  });
+  const activeUsers = data.users.filter((user) => {
+    const activity = user.profile?.lastActivityAt ? new Date(user.profile.lastActivityAt).getTime() : 0;
+    return activity >= fromTime && activity <= toTime;
+  });
+  const messages = data.messages.filter((message) => {
+    const created = new Date(message.createdAt).getTime();
+    return created >= fromTime && created <= toTime;
+  });
+  const groups = data.conversations.filter((conversation) => conversation.kind === 'group' && new Date(conversation.createdAt).getTime() >= fromTime && new Date(conversation.createdAt).getTime() <= toTime);
+  const topUsers = Object.values(
+    data.messages.reduce((acc, message) => {
+      acc[message.senderId] = acc[message.senderId] || { userId: message.senderId, count: 0 };
+      acc[message.senderId].count += 1;
+      return acc;
+    }, {})
+  )
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 10)
+    .map((item) => ({ ...item, user: sanitizeUser(normalizeUserFlags(findUserById(data, item.userId) || { id: item.userId, username: item.userId, email: '', phone: '', password: '', role: 'student', profile: { displayName: item.userId, avatarUrl: null } })) }));
+  const topGroups = data.conversations
+    .map((conversation) => ({
+      id: conversation.id,
+      title: conversation.title,
+      count: data.messages.filter((message) => message.conversationId === conversation.id && new Date(message.createdAt).getTime() >= fromTime && new Date(message.createdAt).getTime() <= toTime).length
+    }))
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 10);
+
+  res.json({
+    range: { from: new Date(fromTime).toISOString(), to: new Date(toTime).toISOString() },
+    counts: {
+      registeredUsers: data.users.length,
+      activeUsers: activeUsers.length,
+      messages: messages.length,
+      groups: groups.length
+    },
+    topUsers,
+    topGroups
+  });
 });
 
 const port = process.env.PORT || 3333;

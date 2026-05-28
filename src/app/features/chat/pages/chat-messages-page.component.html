@@ -1,0 +1,84 @@
+<section class="messages-layout" *ngIf="currentUser() as user">
+  <aside class="conversation-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Razgovori</p>
+        <h2>Chat</h2>
+      </div>
+    </div>
+
+    <label class="field">
+      Pretraga razgovora
+      <input type="search" [value]="chat.conversationSearch()" (input)="setConversationSearch($any($event.target).value)" placeholder="Po nazivu ili opisu">
+    </label>
+
+    <div class="conversation-list">
+      <button class="conversation-item" type="button" *ngFor="let conversation of chat.filteredConversations()" (click)="selectConversation(conversation.id)" [class.active]="chat.activeConversationId() === conversation.id" aria-current="false">
+        <img class="conversation-avatar" [src]="getConversationAvatar(conversation.id)" alt="avatar">
+        <div class="conversation-copy">
+          <div class="conversation-line">
+            <strong>{{ conversation.title }}</strong>
+            <span>{{ getConversationTime(conversation.id) }}</span>
+          </div>
+          <p>{{ getConversationLastMessage(conversation.id) }}</p>
+          <small>{{ getConversationSubtitle(conversation.id) }}</small>
+        </div>
+        <span class="badge" *ngIf="conversation.unreadCount > 0">{{ conversation.unreadCount }}</span>
+      </button>
+    </div>
+  </aside>
+
+  <section class="thread-panel">
+    <ng-container *ngIf="chat.activeConversation() as conversation; else emptyState">
+      <header class="thread-head">
+        <div class="thread-title">
+          <img class="thread-avatar" [src]="getConversationAvatar(conversation.id)" alt="avatar">
+          <div>
+            <h2>{{ getConversationTitle(conversation.id) }}</h2>
+            <p>{{ getConversationSubtitle(conversation.id) }}</p>
+          </div>
+        </div>
+        <div class="thread-meta">
+          <span class="badge">{{ conversation.unreadCount }} nepročitano</span>
+        </div>
+        <label class="field message-search compact-search">
+          Pretraga poruka
+          <input type="search" [value]="chat.messageSearch()" (input)="setMessageSearch($any($event.target).value)" placeholder="Tekst poruke">
+        </label>
+      </header>
+
+      <div class="message-list" #messageList>
+        <article class="message-row" *ngFor="let message of chat.filteredMessages()" [class.mine]="message.senderId === user.id">
+          <div class="message-bubble">
+            <div class="message-line">
+              <strong>{{ message.senderId === user.id ? 'Vi' : (chat.getUserById(message.senderId)?.profile?.displayName || 'Korisnik') }}</strong>
+              <span>{{ message.createdAt | date:'shortTime' }}</span>
+            </div>
+            <p>{{ message.text }}</p>
+            <div class="message-footer">
+              <div class="reaction-summary" *ngIf="getReactionSummary(message.id).length > 0">
+                <span class="reaction-chip" *ngFor="let reaction of getReactionSummary(message.id)">{{ reaction.emoji }} {{ reaction.count }}</span>
+              </div>
+              <span class="delivery-status" [attr.data-status]="message.status">{{ getMessageStatus(message.id) }}</span>
+            </div>
+            <div class="reaction-bar">
+              <button class="reaction-btn" type="button" *ngFor="let emoji of emojiPalette" (click)="reactToMessage(message.id, emoji)">{{ emoji }}</button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <form class="composer" [formGroup]="messageForm" (ngSubmit)="sendMessage()">
+        <input formControlName="text" placeholder="Napiši poruku...">
+        <button class="primary" type="submit">Pošalji</button>
+      </form>
+    </ng-container>
+
+    <ng-template #emptyState>
+      <div class="empty-state">
+        <h3>Nema otvorenog razgovora</h3>
+        <p>Izaberi korisnika u kontaktima ili iz liste razgovora.</p>
+      </div>
+    </ng-template>
+  </section>
+</section>

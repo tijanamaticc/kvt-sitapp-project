@@ -9,7 +9,7 @@ export interface UserProfile {
   lastActivityAt?: string | null;
 }
 
-export type AccountStatus = 'pending' | 'approved' | 'rejected';
+export type AccountStatus = 'pending' | 'approved' | 'rejected' | 'blocked';
 
 export interface User {
   id: string;
@@ -19,5 +19,8 @@ export interface User {
   password: string;
   role: 'student' | 'admin';
   accountStatus?: AccountStatus;
+  blockedAt?: string | null;
+  blockedUntil?: string | null;
+  blockedReason?: string | null;
   profile: UserProfile;
 }

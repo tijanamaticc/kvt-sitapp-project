@@ -1,69 +1,209 @@
-<section class="profile-shell" *ngIf="currentUser() as user">
-  <header class="panel profile-top">
-    <div class="row">
-      <div class="brand-copy">
-        <p class="eyebrow">SitApp</p>
-        <h2>Moj profil</h2>
+<section class="chat-shell" *ngIf="currentUser() as user">
+  <header class="panel hero-panel">
+    <div class="hero-copy">
+      <p class="eyebrow">SitApp</p>
+      <h2>Poruke, razgovori i profil</h2>
+      <p>Pretraži korisnike, otvori razgovor, šalji poruke i prati reakcije i status isporuke.</p>
+    </div>
+    <div class="hero-meta">
+      <div class="hero-card">
+        <strong>{{ user.profile.displayName }}</strong>
+        <span>{{ user.email }}</span>
       </div>
       <button class="ghost" type="button" (click)="logout()">Odjava</button>
     </div>
-    <div class="profile-hero">
-      <img class="avatar hero" [src]="avatarSrc" alt="profilna">
-      <div>
-        <h3>{{ user.profile.displayName }}</h3>
-        <p>{{ user.username }}</p>
-        <p class="muted">Poslednja aktivnost: {{ user.profile.lastActivityAt ? (user.profile.lastActivityAt | date:'short') : 'nema podataka' }}</p>
-      </div>
-    </div>
   </header>
 
-  <main class="profile-grid">
-    <section class="panel form-panel">
-      <h3>Upravljanje profilom</h3>
-      <form class="form-card" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
-        <div class="grid-2">
-          <label>Ime<input formControlName="firstName"></label>
-          <label>Prezime<input formControlName="lastName"></label>
-          <label>Korisničko ime<input formControlName="username"></label>
-          <label>Email<input type="email" formControlName="email"></label>
-          <label>Telefon<input formControlName="phone"></label>
-          <label>Status<input formControlName="status" placeholder="Dostupan, Na sastanku..."></label>
+  <div class="workspace-grid">
+    <aside class="panel roster-panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Korisnici</p>
+          <h3>Pretraga i filteri</h3>
         </div>
-        <label>Biografija<textarea rows="3" formControlName="bio" placeholder="Kratko o sebi"></textarea></label>
-        <label class="avatar-field">
-          <input #fileInput class="file-input" type="file" accept="image/*" (change)="onFileSelected($event)">
-          <button type="button" class="avatar-button" (click)="fileInput.click()">
-            <img class="avatar-img" [src]="avatarSrc" alt="avatar">
-            <span class="avatar-plus">+</span>
-          </button>
-          <p class="avatar-hint">Klikni da promeniš profilnu sliku</p>
-        </label>
-        <button class="primary" type="submit">Sačuvaj profil</button>
-        <p class="hint" *ngIf="saveMessage()">{{ saveMessage() }}</p>
-      </form>
-    </section>
-
-    <section class="panel form-panel">
-      <h3>Promena lozinke</h3>
-      <form class="form-card" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
-        <label>Trenutna lozinka<input type="password" formControlName="currentPassword"></label>
-        <label>Nova lozinka<input type="password" formControlName="newPassword"></label>
-        <label>Ponovi novu lozinku<input type="password" formControlName="confirmPassword"></label>
-        <button class="primary" type="submit">Promeni lozinku</button>
-        <p class="hint" *ngIf="passwordMessage()">{{ passwordMessage() }}</p>
-      </form>
-    </section>
-
-    <section class="panel info-panel">
-      <h3>Tvoji podaci</h3>
-      <div class="info-card">
-        <p><strong>Ime i prezime:</strong> {{ user.profile.displayName }}</p>
-        <p><strong>Username:</strong> {{ user.username }}</p>
-        <p><strong>Email:</strong> {{ user.email }}</p>
-        <p><strong>Telefon:</strong> {{ user.phone }}</p>
-        <p><strong>Status:</strong> {{ user.profile.status || 'Nije postavljen' }}</p>
-        <p><strong>Biografija:</strong> {{ user.profile.bio || 'Nema unete biografije' }}</p>
       </div>
+
+      <label class="field">
+        Pretraga korisnika
+        <input type="search" [value]="chat.userSearch()" (input)="setUserSearch($any($event.target).value)" placeholder="Username, ime, prezime ili telefon">
+      </label>
+
+      <div class="filter-grid compact">
+        <label>
+          Aktivnost
+          <select [value]="chat.activityFilter()" (change)="setActivityFilter($any($event.target).value)">
+            <option value="all">Sve</option>
+            <option value="today">Danas</option>
+            <option value="week">Ove nedelje</option>
+            <option value="month">Ovog meseca</option>
+          </select>
+        </label>
+        <label>
+          Profilna slika
+          <select [value]="chat.avatarFilter()" (change)="setAvatarFilter($any($event.target).value)">
+            <option value="all">Sve</option>
+            <option value="with-avatar">Sa slikom</option>
+            <option value="without-avatar">Bez slike</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="mini-list">
+        <article class="mini-card clickable" *ngFor="let candidate of chat.filteredUsers()" (click)="openUser(candidate.id)">
+          <img class="mini-avatar" [src]="candidate.profile.avatarUrl || defaultAvatar" alt="avatar">
+          <div>
+            <strong>{{ candidate.profile.displayName }}</strong>
+            <p>{{ candidate.username }} · {{ candidate.phone }}</p>
+            <small>{{ candidate.profile.lastActivityAt ? (candidate.profile.lastActivityAt | date:'short') : 'nema aktivnosti' }}</small>
+          </div>
+          <span class="status-pill" [class.blocked]="candidate.accountStatus === 'blocked'">{{ candidate.accountStatus || 'approved' }}</span>
+        </article>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Razgovori</p>
+          <h3>Lista i nepročitane poruke</h3>
+        </div>
+      </div>
+
+      <label class="field">
+        Pretraga razgovora
+        <input type="search" [value]="chat.conversationSearch()" (input)="setConversationSearch($any($event.target).value)" placeholder="Po nazivu ili opisu">
+      </label>
+
+      <div class="mini-list conversations">
+        <button class="conversation-card clickable" type="button" *ngFor="let conversation of chat.filteredConversations()" (click)="selectConversation(conversation.id)">
+          <img class="mini-avatar" [src]="getConversationAvatar(conversation.id)" alt="avatar">
+          <div>
+            <strong>{{ conversation.title }}</strong>
+            <p>{{ getConversationLastMessage(conversation.id) }}</p>
+            <small>{{ getConversationTime(conversation.id) }}</small>
+          </div>
+          <div class="conversation-meta">
+            <span class="status-pill">{{ conversation.kind }}</span>
+            <span class="badge" *ngIf="conversation.unreadCount > 0">{{ conversation.unreadCount }}</span>
+          </div>
+        </button>
+      </div>
+    </aside>
+
+    <section class="panel thread-panel">
+      <ng-container *ngIf="chat.activeConversation() as conversation; else emptyThread">
+        <div class="thread-head">
+          <div class="thread-title">
+            <img class="thread-avatar" [src]="getConversationAvatar(conversation.id)" alt="avatar">
+            <div>
+              <p class="eyebrow">Aktivan razgovor</p>
+              <h3>{{ getConversationTitle(conversation.id) }}</h3>
+              <p>{{ getConversationSubtitle(conversation.id) }}</p>
+            </div>
+          </div>
+          <div class="thread-actions">
+            <span class="status-pill">{{ conversation.kind === 'group' ? 'Grupa' : 'Direktno' }}</span>
+            <span class="badge">{{ conversation.unreadCount }} nepročitano</span>
+          </div>
+        </div>
+
+        <label class="field narrow-search">
+          Pretraga poruka
+          <input type="search" [value]="chat.messageSearch()" (input)="setMessageSearch($any($event.target).value)" placeholder="Tekst poruke">
+        </label>
+
+        <div class="message-stream">
+          <article class="message-row" *ngFor="let message of chat.filteredMessages()" [class.mine]="message.senderId === user.id">
+            <div class="message-bubble">
+              <div class="message-topline">
+                <strong>{{ message.senderId === user.id ? 'Vi' : (chat.getUserById(message.senderId)?.profile?.displayName || 'Korisnik') }}</strong>
+                <span>{{ message.createdAt | date:'shortTime' }}</span>
+              </div>
+              <p>{{ message.text }}</p>
+              <div class="message-footer">
+                <div class="reaction-summary" *ngIf="getReactionSummary(message.id).length > 0">
+                  <span class="reaction-chip" *ngFor="let reaction of getReactionSummary(message.id)">{{ reaction.emoji }} {{ reaction.count }}</span>
+                </div>
+                <span class="delivery-status">{{ getMessageStatus(message.id) }}</span>
+              </div>
+              <div class="reaction-bar">
+                <button class="reaction-btn" type="button" *ngFor="let emoji of emojiPalette" (click)="reactToMessage(message.id, emoji)">{{ emoji }}</button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <form class="composer" [formGroup]="messageForm" (ngSubmit)="sendMessage()">
+          <input formControlName="text" placeholder="Napiši poruku...">
+          <button class="primary" type="submit">Pošalji</button>
+        </form>
+      </ng-container>
+
+      <ng-template #emptyThread>
+        <div class="empty-thread">
+          <h3>Nema otvorenog razgovora</h3>
+          <p>Izaberi korisnika sa leve strane da otvoriš direktan razgovor, ili pokreni grupu kroz postojeću listu razgovora.</p>
+        </div>
+      </ng-template>
     </section>
-  </main>
+  </div>
+
+  <section class="panel profile-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Profil</p>
+        <h3>Upravljanje profilom i lozinkom</h3>
+      </div>
+    </div>
+
+    <div class="profile-grid">
+      <section class="panel inner-panel form-panel">
+        <h3>Upravljanje profilom</h3>
+        <form class="form-card" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+          <div class="grid-2">
+            <label>Ime<input formControlName="firstName"></label>
+            <label>Prezime<input formControlName="lastName"></label>
+            <label>Korisničko ime<input formControlName="username"></label>
+            <label>Email<input type="email" formControlName="email"></label>
+            <label>Telefon<input formControlName="phone"></label>
+            <label>Status<input formControlName="status" placeholder="Dostupan, Na sastanku..."></label>
+          </div>
+          <label>Biografija<textarea rows="3" formControlName="bio" placeholder="Kratko o sebi"></textarea></label>
+          <label class="avatar-field">
+            <input #fileInput class="file-input" type="file" accept="image/*" (change)="onFileSelected($event)">
+            <button type="button" class="avatar-button" (click)="fileInput.click()">
+              <img class="avatar-img" [src]="avatarSrc" alt="avatar">
+              <span class="avatar-plus">+</span>
+            </button>
+            <p class="avatar-hint">Klikni da promeniš profilnu sliku</p>
+          </label>
+          <button class="primary" type="submit">Sačuvaj profil</button>
+          <p class="hint" *ngIf="saveMessage()">{{ saveMessage() }}</p>
+        </form>
+      </section>
+
+      <section class="panel inner-panel form-panel">
+        <h3>Promena lozinke</h3>
+        <form class="form-card" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+          <label>Trenutna lozinka<input type="password" formControlName="currentPassword"></label>
+          <label>Nova lozinka<input type="password" formControlName="newPassword"></label>
+          <label>Ponovi novu lozinku<input type="password" formControlName="confirmPassword"></label>
+          <button class="primary" type="submit">Promeni lozinku</button>
+          <p class="hint" *ngIf="passwordMessage()">{{ passwordMessage() }}</p>
+        </form>
+      </section>
+
+      <section class="panel inner-panel info-panel">
+        <h3>Tvoji podaci</h3>
+        <div class="info-card">
+          <p><strong>Ime i prezime:</strong> {{ user.profile.displayName }}</p>
+          <p><strong>Username:</strong> {{ user.username }}</p>
+          <p><strong>Email:</strong> {{ user.email }}</p>
+          <p><strong>Telefon:</strong> {{ user.phone }}</p>
+          <p><strong>Status:</strong> {{ user.profile.status || 'Nije postavljen' }}</p>
+          <p><strong>Biografija:</strong> {{ user.profile.bio || 'Nema unete biografije' }}</p>
+        </div>
+      </section>
+    </div>
+  </section>
 </section>

@@ -12,4 +12,5 @@ export interface Conversation {
   pinned: boolean;
   unreadCount: number;
   lastMessageId: string | null;
+  lastActivityAt?: string | null;
 }

@@ -1,34 +1,28 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ChatStoreService } from '../../../core/services/chat-store.service';
 import { User } from '../../../core/models/user.model';
 
 @Component({
-  selector: 'app-chat-page',
+  selector: 'app-chat-profile-page',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
-  templateUrl: './chat-page.component.html',
-  styleUrls: ['./chat-page.component.css']
+  templateUrl: './chat-profile-page.component.html',
+  styleUrls: ['./chat-profile-page.component.css']
 })
-export class ChatPageComponent {
+export class ChatProfilePageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   readonly chat = inject(ChatStoreService);
-  private readonly router = inject(Router);
-
   readonly currentUser = this.auth.currentUser;
-  readonly defaultAvatar = 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A//www.w3.org/2000/svg%22 viewBox%3D%220 0 120 120%22%3E%3Crect width%3D%22120%22 height%3D%22120%22 fill%3D%22%23e7f8ef%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2238%22 r%3D%2230%22 fill%3D%22%2325d366%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2262%22 r%3D%2216%22 fill%3D%22%23ffffff%22/%3E%3Crect x%3D%2242%22 y%3D%2278%22 width%3D%2236%22 height%3D%2210%22 rx%3D%225%22 fill%3D%22%23ffffff%22/%3E%3C/svg%3E';
+  readonly defaultAvatar =
+    'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A//www.w3.org/2000/svg%22 viewBox%3D%220 0 120 120%22%3E%3Crect width%3D%22120%22 height%3D%22120%22 fill%3D%22%23e7f8ef%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2238%22 r%3D%2230%22 fill%3D%22%2325d366%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2262%22 r%3D%2216%22 fill%3D%22%23ffffff%22/%3E%3Crect x%3D%2242%22 y%3D%2278%22 width%3D%2236%22 height%3D%2210%22 rx%3D%225%22 fill%3D%22%23ffffff%22/%3E%3C/svg%3E';
   readonly avatarPreview = signal<string | null>(null);
   readonly selectedFile = signal<File | null>(null);
   readonly saveMessage = signal('');
   readonly passwordMessage = signal('');
-  readonly messageForm = this.fb.nonNullable.group({
-    text: ['', Validators.required]
-  });
-  readonly emojiPalette = ['👍', '❤️', '😂', '👏'];
 
   readonly profileForm = this.fb.nonNullable.group({
     firstName: ['', Validators.required],
@@ -139,105 +133,5 @@ export class ChatPageComponent {
 
     this.passwordForm.reset();
     this.passwordMessage.set('Lozinka je promenjena.');
-  }
-
-  openUser(userId: string): void {
-    this.chat.startDirectConversation(userId);
-    this.chat.setMessageSearch('');
-  }
-
-  selectConversation(conversationId: string): void {
-    this.chat.setActiveConversation(conversationId);
-    this.chat.setMessageSearch('');
-  }
-
-  sendMessage(): void {
-    if (this.messageForm.invalid) {
-      return;
-    }
-
-    const text = this.messageForm.value.text ?? '';
-    this.chat.sendMessage(text);
-    this.messageForm.reset({ text: '' });
-  }
-
-  reactToMessage(messageId: string, emoji: string): void {
-    this.chat.reactToMessage(messageId, emoji);
-  }
-
-  getConversationTitle(conversationId: string): string {
-    const conversation = this.chat.conversations().find((item) => item.id === conversationId);
-    return conversation?.title || 'Razgovor';
-  }
-
-  getConversationSubtitle(conversationId: string): string {
-    const conversation = this.chat.conversations().find((item) => item.id === conversationId);
-    if (!conversation) {
-      return '';
-    }
-
-    return conversation.description || (conversation.kind === 'group' ? `${conversation.memberIds.length} članova` : 'Direktan razgovor');
-  }
-
-  getConversationLastMessage(conversationId: string): string {
-    const messages = this.chat.messages().filter((message) => message.conversationId === conversationId);
-    return messages.length > 0 ? messages[messages.length - 1].text : 'Nema poruka';
-  }
-
-  getConversationTime(conversationId: string): string {
-    const conversation = this.chat.conversations().find((item) => item.id === conversationId);
-    const timestamp = conversation?.lastActivityAt || conversation?.updatedAt || conversation?.createdAt;
-    return timestamp ? new Date(timestamp).toLocaleString() : '';
-  }
-
-  getConversationAvatar(conversationId: string): string {
-    const conversation = this.chat.conversations().find((item) => item.id === conversationId);
-    if (!conversation) {
-      return this.defaultAvatar;
-    }
-
-    const partner = this.chat.getConversationPartner(conversation);
-    const avatar = partner?.profile.avatarUrl;
-    if (avatar && avatar.startsWith('/uploads/')) {
-      return `${AuthService.SERVER_ORIGIN}${avatar}`;
-    }
-
-    return avatar || this.defaultAvatar;
-  }
-
-  getMessageStatus(messageId: string): string {
-    const message = this.chat.messages().find((item) => item.id === messageId);
-    const currentUser = this.currentUser();
-    return message ? this.chat.getMessageStatusIcon(message, currentUser?.id) : '•';
-  }
-
-  getReactionSummary(messageId: string): Array<{ emoji: string; count: number }> {
-    const message = this.chat.messages().find((item) => item.id === messageId);
-    return message ? this.chat.getReactionSummary(message) : [];
-  }
-
-  setUserSearch(value: string): void {
-    this.chat.setUserSearch(value);
-  }
-
-  setConversationSearch(value: string): void {
-    this.chat.setConversationSearch(value);
-  }
-
-  setMessageSearch(value: string): void {
-    this.chat.setMessageSearch(value);
-  }
-
-  setActivityFilter(value: 'all' | 'today' | 'week' | 'month'): void {
-    this.chat.setActivityFilter(value);
-  }
-
-  setAvatarFilter(value: 'all' | 'with-avatar' | 'without-avatar'): void {
-    this.chat.setAvatarFilter(value);
-  }
-
-  logout(): void {
-    this.auth.logout();
-    this.router.navigateByUrl('/login');
   }
 }

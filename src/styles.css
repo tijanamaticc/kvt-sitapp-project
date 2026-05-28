@@ -6,11 +6,11 @@
   --border: rgba(61, 108, 171, 0.16);
   --text: #17324d;
   --muted: #5f748b;
-  --primary: #25d366;
-  --primary-strong: #128c7e;
-  --primary-soft: #ddf8e5;
-  --accent: #7ee5b0;
-  --success: #2eaf7d;
+  --primary: #4fb3ff;
+  --primary-strong: #2b8ee6;
+  --primary-soft: #d9f2ff;
+  --accent: #8fd7ff;
+  --success: #2b8ee6;
   --danger: #d96262;
   --shadow: 0 24px 60px rgba(28, 93, 63, 0.12);
   --radius-xl: 28px;
@@ -32,9 +32,9 @@ body {
   font-family: 'Inter', sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(126, 229, 176, 0.3), transparent 32%),
-    radial-gradient(circle at top right, rgba(37, 211, 102, 0.16), transparent 30%),
-    linear-gradient(135deg, #fbfdfb 0%, #f5f7f5 48%, #edf5ef 100%);
+    radial-gradient(circle at top left, rgba(143, 215, 255, 0.28), transparent 32%),
+    radial-gradient(circle at top right, rgba(79, 179, 255, 0.12), transparent 30%),
+    linear-gradient(135deg, #fbfdff 0%, #f5fbff 48%, #eef8ff 100%);
 }
 
 button, input, textarea, select {

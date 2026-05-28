@@ -15,11 +15,11 @@ export const guestGuard: CanActivateFn = () => {
     return true;
   }
 
-  return auth.currentUser()?.role === 'admin' ? router.createUrlTree(['/admin']) : router.createUrlTree(['/chat']);
+  return auth.currentUser()?.role === 'admin' ? router.createUrlTree(['/admin']) : router.createUrlTree(['/chat/messages']);
 };
 
 export const adminGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  return auth.currentUser()?.role === 'admin' ? true : router.createUrlTree(['/chat']);
+  return auth.currentUser()?.role === 'admin' ? true : router.createUrlTree(['/chat/messages']);
 };

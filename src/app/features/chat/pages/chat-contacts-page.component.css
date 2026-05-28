@@ -1,0 +1,122 @@
+:host {
+  display: block;
+  min-height: 100%;
+}
+
+.contacts-layout {
+  min-height: 100vh;
+  padding: 22px;
+  background: linear-gradient(180deg, #0b141a, #111b21);
+  color: #e9edef;
+  display: grid;
+  gap: 18px;
+}
+
+.contacts-head h2 {
+  margin: 6px 0;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.contacts-head p,
+.contact-copy p,
+.contact-copy small,
+.contact-line span {
+  color: #8696a0;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+input,
+select {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 13px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e9edef;
+  outline: none;
+}
+
+.contact-list {
+  display: grid;
+  gap: 12px;
+}
+
+.contact-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  border: 0;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  cursor: pointer;
+}
+
+.contact-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.contact-card.active {
+  background: linear-gradient(90deg, rgba(79,179,255,0.06), rgba(79,179,255,0.02));
+  border-left: 4px solid rgba(79,179,255,0.9);
+}
+
+.contact-card.active .avatar {
+  box-shadow: 0 0 0 3px rgba(79,179,255,0.12);
+}
+
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.contact-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(79, 179, 255, 0.12);
+  color: var(--primary);
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-card {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+}

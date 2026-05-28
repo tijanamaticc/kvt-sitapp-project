@@ -1,23 +1,103 @@
 <section class="admin-shell" *ngIf="currentUser() as user">
-  <header class="panel admin-top">
-    <div class="row">
-      <div>
-        <p class="eyebrow">SitApp</p>
-        <h2>Odobravanje registracija</h2>
+  <header class="panel hero-panel">
+    <div class="hero-copy">
+      <p class="eyebrow">SitApp admin</p>
+      <h2>Kontrola korisnika i analitika sistema</h2>
+      <p>Odobri registracije, blokiraj korisnike, vrati blokadu i prati aktivnost sistema po izabranom periodu.</p>
+    </div>
+    <div class="hero-meta">
+      <div class="hero-card">
+        <strong>{{ user.profile.displayName }}</strong>
+        <span>{{ user.email }}</span>
       </div>
       <button class="ghost" type="button" (click)="logout()">Odjava</button>
     </div>
-    <div class="admin-summary">
-      <strong>{{ user.profile.displayName }}</strong>
-    </div>
   </header>
 
-  <main class="panel admin-panel">
-    <div class="row title-row">
-      <h3>{{ viewAll() ? 'Svi korisnici' : 'Pending registracije' }}</h3>
-      <div style="display:flex;gap:8px;">
-        <button class="ghost" type="button" (click)="load()">Osveži</button>
+  <section class="panel analytics-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Analitika</p>
+        <h3>Izabrani vremenski opseg</h3>
+      </div>
+      <div class="range-actions">
+        <button class="ghost" type="button" (click)="setAnalyticsPreset(1)">Danas</button>
+        <button class="ghost" type="button" (click)="setAnalyticsPreset(7)">Nedelja</button>
+        <button class="ghost" type="button" (click)="setAnalyticsPreset(30)">Mesec</button>
+        <button class="ghost" type="button" (click)="setAnalyticsPreset(365)">Godina</button>
+      </div>
+    </div>
 
+    <div class="filter-grid compact">
+      <label>
+        Početni datum
+        <input type="date" [value]="analyticsFrom()" (change)="setAnalyticsRangeFrom($any($event.target).value)">
+      </label>
+      <label>
+        Krajnji datum
+        <input type="date" [value]="analyticsTo()" (change)="setAnalyticsRangeTo($any($event.target).value)">
+      </label>
+    </div>
+
+    <div class="metrics-grid" *ngIf="analytics() as stats; else analyticsLoadingState">
+      <article class="metric-card">
+        <p>Registrovani korisnici</p>
+        <strong>{{ stats.counts.registeredUsers }}</strong>
+      </article>
+      <article class="metric-card">
+        <p>Aktivni korisnici</p>
+        <strong>{{ stats.counts.activeUsers }}</strong>
+      </article>
+      <article class="metric-card">
+        <p>Poruke</p>
+        <strong>{{ stats.counts.messages }}</strong>
+      </article>
+      <article class="metric-card">
+        <p>Grupe</p>
+        <strong>{{ stats.counts.groups }}</strong>
+      </article>
+    </div>
+
+    <ng-template #analyticsLoadingState>
+      <p class="hint" *ngIf="analyticsLoading()">Učitavanje analitike...</p>
+    </ng-template>
+
+    <div class="analytics-lists" *ngIf="analytics() as stats">
+      <section>
+        <h4>Najaktivniji korisnici</h4>
+        <div class="analytics-list">
+          <div class="analytics-row" *ngFor="let item of stats.topUsers">
+            <div>
+              <strong>{{ item.user.profile.displayName }}</strong>
+              <p>{{ item.user.username }}</p>
+            </div>
+            <span class="badge">{{ item.count }} poruka</span>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h4>Najaktivnije grupe</h4>
+        <div class="analytics-list">
+          <div class="analytics-row" *ngFor="let item of stats.topGroups">
+            <div>
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.id }}</p>
+            </div>
+            <span class="badge">{{ item.count }} poruka</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="panel users-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Korisnici</p>
+        <h3>Svi korisnici</h3>
+      </div>
+      <div class="range-actions">
+        <button class="ghost" type="button" (click)="load()">Osveži</button>
       </div>
     </div>
 
@@ -28,18 +108,26 @@
       <article class="request-card" *ngFor="let item of users()">
         <img class="avatar" [src]="getAvatar(item)" alt="avatar">
         <div class="request-copy">
-          <div class="row">
+          <div class="card-line">
             <strong>{{ item.profile.displayName }}</strong>
             <span class="pill">{{ item.accountStatus || 'approved' }}</span>
           </div>
           <p>{{ item.username }} · {{ item.email }}</p>
           <p>{{ item.phone }}</p>
           <p class="muted">{{ item.profile.bio || 'Nema biografije' }}</p>
+          <p class="muted" *ngIf="item.blockedReason">Blokada: {{ item.blockedReason }} · {{ item.blockedAt ? (item.blockedAt | date:'short') : 'bez datuma' }}</p>
         </div>
         <div class="actions">
-          <button *ngIf="!viewAll()" class="primary" type="button" (click)="approve(item.id)">Odobri</button>
-          <button *ngIf="!viewAll()" class="ghost danger" type="button" (click)="reject(item.id)">Odbij</button>
-          <button *ngIf="viewAll()" class="ghost danger" type="button" (click)="deleteUser(item.id)">Obriši</button>
+          <ng-container *ngIf="item.id !== currentUser()?.id; else selfActions">
+            <button *ngIf="item.accountStatus === 'pending'" class="primary" type="button" (click)="approve(item.id)">Odobri</button>
+            <button *ngIf="item.accountStatus === 'pending'" class="ghost danger" type="button" (click)="reject(item.id)">Odbij</button>
+            <button *ngIf="item.accountStatus === 'approved'" class="ghost danger" type="button" (click)="blockUser(item.id)">Blokiraj</button>
+            <button *ngIf="item.accountStatus === 'blocked'" class="primary" type="button" (click)="unblockUser(item.id)">Ukloni blokadu</button>
+            <button *ngIf="item.accountStatus === 'rejected'" class="ghost danger" type="button" (click)="deleteUser(item.id)">Obriši</button>
+          </ng-container>
+          <ng-template #selfActions>
+            <div class="self-label">Vaš nalog</div>
+          </ng-template>
         </div>
       </article>
     </div>
@@ -47,5 +135,5 @@
     <ng-template #emptyState>
       <div class="empty-state">Nema korisnika za prikaz.</div>
     </ng-template>
-  </main>
+  </section>
 </section>

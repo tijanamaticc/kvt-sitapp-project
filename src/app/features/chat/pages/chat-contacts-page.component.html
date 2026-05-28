@@ -1,0 +1,48 @@
+<section class="contacts-layout" *ngIf="currentUser() as user">
+  <header class="contacts-head">
+    <div>
+      <p class="eyebrow">Kontakti</p>
+      <h2>Pretraga i novi razgovor</h2>
+      <p>Klikni na korisnika da otvoriš razgovor.</p>
+    </div>
+  </header>
+
+  <div class="filter-grid">
+    <label>
+      Pretraga kontakata
+      <input type="search" [value]="chat.userSearch()" (input)="setUserSearch($any($event.target).value)" placeholder="Username, ime, prezime ili telefon">
+    </label>
+    <label>
+      Aktivnost
+      <select [value]="chat.activityFilter()" (change)="setActivityFilter($any($event.target).value)">
+        <option value="all">Sve</option>
+        <option value="today">Danas</option>
+        <option value="week">Ove nedelje</option>
+        <option value="month">Ovog meseca</option>
+      </select>
+    </label>
+    <label>
+      Profilna slika
+      <select [value]="chat.avatarFilter()" (change)="setAvatarFilter($any($event.target).value)">
+        <option value="all">Sve</option>
+        <option value="with-avatar">Sa slikom</option>
+        <option value="without-avatar">Bez slike</option>
+      </select>
+    </label>
+  </div>
+
+    <div class="contact-list">
+    <button class="contact-card" type="button" *ngFor="let candidate of chat.filteredUsers()" (click)="openContact(candidate.id)" [class.active]="chat.activeConversation()?.memberIds?.includes(candidate.id)">
+      <img class="avatar" [src]="getAvatar(candidate.profile.avatarUrl)" alt="avatar">
+      <div class="contact-copy">
+        <div class="contact-line">
+          <strong>{{ candidate.profile.displayName }}</strong>
+          <span>{{ candidate.profile.lastActivityAt ? (candidate.profile.lastActivityAt | date:'short') : 'nema aktivnosti' }}</span>
+        </div>
+        <p>{{ candidate.username }} · {{ candidate.phone }}</p>
+        <small>{{ candidate.profile.bio || 'Nema biografije' }}</small>
+      </div>
+      <span class="pill">Otvori</span>
+    </button>
+  </div>
+</section>

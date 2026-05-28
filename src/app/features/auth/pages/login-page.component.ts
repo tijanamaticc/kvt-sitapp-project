@@ -57,7 +57,7 @@ export class LoginPageComponent {
       return;
     }
 
-    this.router.navigateByUrl(result.role === 'admin' ? '/admin' : '/chat');
+    this.router.navigateByUrl(result.role === 'admin' ? '/admin' : '/chat/messages');
   }
 
   async submitRegister(): Promise<void> {
