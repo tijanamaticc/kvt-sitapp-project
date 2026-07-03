@@ -55,8 +55,23 @@ export class ChatStoreService {
   readonly filteredConversations = computed(() => {
     const query = this.conversationSearchSignal().trim().toLowerCase();
     const activityFilter = this.activityFilterSignal();
+    const currentUser = this.auth.currentUser();
+    const me = currentUser ? this.getUserById(currentUser.id) : null;
+
     return this.sortConversations(
       this.conversationsSignal().filter((conversation) => {
+        if (!currentUser || !conversation.memberIds.includes(currentUser.id)) {
+          return false;
+        }
+
+        // Students should not see conversations with administrator in chat UI.
+        if (me?.role !== 'admin') {
+          const hasAdminMember = conversation.memberIds.some((memberId) => this.getUserById(memberId)?.role === 'admin');
+          if (hasAdminMember) {
+            return false;
+          }
+        }
+
         if (query && ![conversation.title, conversation.description].join(' ').toLowerCase().includes(query)) {
           return false;
         }
@@ -83,6 +98,9 @@ export class ChatStoreService {
     const userList = this.auth.users().filter((user) => user.id !== currentUser?.id);
 
     return userList
+      .filter((user) => (user.accountStatus || 'approved') === 'approved')
+      .filter((user) => (user.accountStatus || 'approved') !== 'blocked')
+      .filter((user) => user.role !== 'admin')
       .filter((user) => {
         if (!query) {
           return true;
@@ -162,15 +180,12 @@ export class ChatStoreService {
 
     this.auth.bootstrap(seedUsers[0]);
 
-    if (this.conversationsSignal().length === 0 || this.messagesSignal().length === 0) {
-      const seeded = this.buildSeed(currentUser.id, seedUsers);
-      this.conversationsSignal.set(seeded.conversations);
-      this.messagesSignal.set(seeded.messages);
-      this.activeConversationIdSignal.set(seeded.conversations[0]?.id ?? null);
-    }
+    void this.auth.refreshUsersFromServer().then(() => {
+      this.cleanupStateForCurrentUser();
+    });
 
-    if (!this.activeConversationIdSignal() && this.conversationsSignal().length > 0) {
-      this.activeConversationIdSignal.set(this.conversationsSignal()[0].id);
+    if (this.activeConversationIdSignal() && !this.conversationsSignal().some((conversation) => conversation.id === this.activeConversationIdSignal())) {
+      this.activeConversationIdSignal.set(null);
     }
   }
 
@@ -199,14 +214,27 @@ export class ChatStoreService {
     this.markConversationRead(conversationId);
   }
 
+  clearActiveConversation(): void {
+    this.activeConversationIdSignal.set(null);
+    this.messageSearchSignal.set('');
+  }
+
   startDirectConversation(partnerId: string): void {
     const currentUser = this.requireCurrentUser();
+    if (partnerId === currentUser.id) {
+      return;
+    }
+
+    const partner = this.requireUser(partnerId);
+    if (currentUser.role !== 'admin' && partner.role === 'admin') {
+      return;
+    }
+
     let conversation = this.conversationsSignal().find((item) => {
       return item.kind === 'direct' && item.memberIds.includes(currentUser.id) && item.memberIds.includes(partnerId);
     });
 
     if (!conversation) {
-      const partner = this.requireUser(partnerId);
       conversation = {
         id: crypto.randomUUID(),
         kind: 'direct',
@@ -307,6 +335,42 @@ export class ChatStoreService {
     this.markConversationRead(conversation.id);
   }
 
+  async sendAudioMessage(blob: Blob, durationSec: number): Promise<void> {
+    const conversation = this.activeConversation();
+    const currentUser = this.requireCurrentUser();
+    if (!conversation || blob.size === 0) {
+      return;
+    }
+
+    if ((currentUser.accountStatus || 'approved') === 'blocked') {
+      return;
+    }
+
+    const dataUrl = await this.blobToDataUrl(blob);
+    const message: Message = {
+      id: crypto.randomUUID(),
+      conversationId: conversation.id,
+      senderId: currentUser.id,
+      text: 'Glasovna poruka',
+      createdAt: new Date().toISOString(),
+      status: 'sent',
+      kind: 'audio',
+      audio: {
+        url: dataUrl,
+        mimeType: blob.type || 'audio/webm',
+        durationSec: Math.max(1, Math.round(durationSec))
+      },
+      deliveredAt: null,
+      readAt: null,
+      reactions: []
+    };
+
+    this.messagesSignal.update((messages) => [...messages, message]);
+    this.updateConversationTouch(conversation.id, message.id);
+    this.scheduleDelivery(message.id);
+    this.markConversationRead(conversation.id);
+  }
+
   reactToMessage(messageId: string, emoji: string): void {
     const currentUser = this.requireCurrentUser();
     this.messagesSignal.update((messages) =>
@@ -355,9 +419,28 @@ export class ChatStoreService {
     return '✓';
   }
 
+  getConversationUnreadCount(conversationId: string): number {
+    const currentUser = this.auth.currentUser();
+    if (!currentUser) {
+      return 0;
+    }
+
+    return this.messagesSignal().filter((message) => {
+      if (message.conversationId !== conversationId) {
+        return false;
+      }
+
+      if (message.senderId === currentUser.id) {
+        return false;
+      }
+
+      return !message.readAt;
+    }).length;
+  }
+
   logout(): void {
     this.auth.logout();
-    this.activeConversationIdSignal.set(null);
+    this.clearActiveConversation();
   }
 
   getConversationMembers(conversation: Conversation): User[] {
@@ -449,9 +532,9 @@ export class ChatStoreService {
 
         return {
           ...conversation,
-          title: nextUser.profile.displayName,
-          description: nextUser.profile.status ?? '',
-          avatarSeed: nextUser.profile.avatarSeed ?? nextUser.profile.displayName,
+          title: partner.profile.displayName,
+          description: partner.profile.status ?? '',
+          avatarSeed: partner.profile.avatarSeed ?? partner.profile.displayName,
           lastActivityAt: conversation.lastActivityAt || conversation.updatedAt
         };
       })
@@ -486,41 +569,43 @@ export class ChatStoreService {
   }
 
   private buildSeed(currentUserId: string, seedUsers: User[]): { conversations: Conversation[]; messages: Message[] } {
-    const teammate = seedUsers.find((user) => user.id !== currentUserId && user.username === 'ana') ?? seedUsers.find((user) => user.id !== currentUserId) ?? null;
-    const designGroupMembers = seedUsers.filter((user) => ['ana', 'marko', 'jelena'].includes(user.username)).map((user) => user.id);
-    const directConversation: Conversation = {
-      id: crypto.randomUUID(),
-      kind: 'direct',
-      title: teammate?.profile.displayName ?? 'Kontakt',
-      memberIds: [currentUserId, teammate?.id ?? currentUserId],
-      avatarSeed: teammate?.profile.avatarSeed ?? 'A',
-      description: teammate?.profile.status ?? 'Online',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      pinned: true,
-      unreadCount: 0,
-      lastMessageId: null
-    };
-
-    const groupConversation: Conversation = {
-      id: crypto.randomUUID(),
-      kind: 'group',
-      title: 'SVT grupa',
-      memberIds: Array.from(new Set([currentUserId, ...designGroupMembers])),
-      avatarSeed: 'SVT',
-      description: 'Dogovor za projekat i raspodela zadataka',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      pinned: false,
-      unreadCount: 2,
-      lastMessageId: null
-    };
-
-    // Seed only empty conversations (no historic messages)
     return {
-      conversations: [directConversation, groupConversation],
+      conversations: [],
       messages: []
     };
+  }
+
+  private cleanupStateForCurrentUser(): void {
+    const currentUser = this.auth.currentUser();
+    if (!currentUser) {
+      return;
+    }
+
+    const cleanConversations = this.conversationsSignal().filter((conversation) => {
+      if (!conversation.memberIds.includes(currentUser.id)) {
+        return false;
+      }
+
+      if (currentUser.role !== 'admin') {
+        const hasAdminMember = conversation.memberIds.some((memberId) => this.getUserById(memberId)?.role === 'admin');
+        if (hasAdminMember) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const cleanConversationIds = new Set(cleanConversations.map((conversation) => conversation.id));
+    const cleanMessages = this.messagesSignal().filter((message) => cleanConversationIds.has(message.conversationId));
+
+    this.conversationsSignal.set(cleanConversations);
+    this.messagesSignal.set(cleanMessages);
+
+    const activeId = this.activeConversationIdSignal();
+    if (activeId && !cleanConversationIds.has(activeId)) {
+      this.activeConversationIdSignal.set(null);
+    }
   }
 
   private requireCurrentUser(): User {
@@ -549,6 +634,15 @@ export class ChatStoreService {
   private readMessages(): Message[] {
     const raw = localStorage.getItem(MESSAGES_KEY);
     return raw ? (JSON.parse(raw) as Message[]) : [];
+  }
+
+  private blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Neuspesno citanje audio sadrzaja.'));
+      reader.readAsDataURL(blob);
+    });
   }
 
   /**

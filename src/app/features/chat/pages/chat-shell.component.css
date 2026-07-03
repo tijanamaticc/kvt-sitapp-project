@@ -6,7 +6,7 @@
 .shell-layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   background: #111b21;
   color: #e9edef;
 }
@@ -20,34 +20,53 @@
   background: #111b21;
 }
 
-.sidebar-brand,
-.sidebar-user {
-  display: grid;
-  justify-items: center;
-  text-align: center;
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   gap: 8px;
+  padding: 2px 2px 4px;
 }
 
 .brand-badge {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, #4fb3ff, #2b8ee6);
   color: white;
   font-weight: 900;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
+}
+
+.brand-badge svg {
+  width: 22px;
+  height: 22px;
+}
+
+.brand-name {
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-user {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .sidebar-avatar {
-  width: 42px;
-  height: 42px;
+  width: 52px;
+  height: 52px;
   border-radius: 999px;
   object-fit: cover;
 }
 
-.sidebar-brand p,
 .sidebar-user p {
   margin: 0;
   color: #8696a0;
@@ -94,7 +113,7 @@
 
   .sidebar {
     grid-template-rows: auto;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: center;
     gap: 10px;
     border-right: 0;

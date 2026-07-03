@@ -177,11 +177,6 @@ select {
   gap: 10px;
 }
 
-  pill {
-  background: rgba(79, 179, 255, 0.12);
-  color: var(--primary-strong);
-}
-
 .badge {
   background: rgba(43, 142, 230, 0.12);
   color: var(--primary-strong);

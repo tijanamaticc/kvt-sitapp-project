@@ -6,11 +6,12 @@
       <p>Ovde menjaš podatke, avatar i lozinku.</p>
     </div>
     <div class="profile-card">
-      <img class="profile-avatar" [src]="avatarSrc" alt="profilna">
-      <div>
+      <div class="profile-card-copy">
+        <span class="profile-time">{{ user.profile.lastActivityAt ? (user.profile.lastActivityAt | date:'short') : 'nema aktivnosti' }}</span>
         <strong>{{ user.profile.displayName }}</strong>
         <p>{{ user.username }}</p>
       </div>
+      <img class="profile-avatar" [src]="avatarSrc" alt="profilna">
     </div>
   </header>
 
@@ -33,7 +34,7 @@
             <img class="avatar-img" [src]="avatarSrc" alt="avatar">
             <span class="avatar-plus">+</span>
           </button>
-          <p class="avatar-hint">Klikni da promeniš profilnu sliku</p>
+          <p class="avatar-hint">Promeni sliku</p>
         </label>
         <button class="primary" type="submit">Sačuvaj profil</button>
         <p class="hint" *ngIf="saveMessage()">{{ saveMessage() }}</p>

@@ -3,7 +3,7 @@
     <div class="panel-head">
       <div>
         <p class="eyebrow">Razgovori</p>
-        <h2>Chat</h2>
+        <h2>Inbox</h2>
       </div>
     </div>
 
@@ -17,13 +17,12 @@
         <img class="conversation-avatar" [src]="getConversationAvatar(conversation.id)" alt="avatar">
         <div class="conversation-copy">
           <div class="conversation-line">
-            <strong>{{ conversation.title }}</strong>
-            <span>{{ getConversationTime(conversation.id) }}</span>
+            <strong>{{ getConversationTitle(conversation.id) }}</strong>
           </div>
           <p>{{ getConversationLastMessage(conversation.id) }}</p>
           <small>{{ getConversationSubtitle(conversation.id) }}</small>
         </div>
-        <span class="badge" *ngIf="conversation.unreadCount > 0">{{ conversation.unreadCount }}</span>
+        <span class="badge" *ngIf="chat.getConversationUnreadCount(conversation.id) > 0">{{ chat.getConversationUnreadCount(conversation.id) }}</span>
       </button>
     </div>
   </aside>
@@ -39,7 +38,7 @@
           </div>
         </div>
         <div class="thread-meta">
-          <span class="badge">{{ conversation.unreadCount }} nepročitano</span>
+          <span class="badge">{{ chat.getConversationUnreadCount(conversation.id) }} nepročitano</span>
         </div>
         <label class="field message-search compact-search">
           Pretraga poruka
@@ -54,14 +53,18 @@
               <strong>{{ message.senderId === user.id ? 'Vi' : (chat.getUserById(message.senderId)?.profile?.displayName || 'Korisnik') }}</strong>
               <span>{{ message.createdAt | date:'shortTime' }}</span>
             </div>
-            <p>{{ message.text }}</p>
+            <p *ngIf="message.kind === 'text'">{{ message.text }}</p>
+            <div class="audio-message" *ngIf="message.kind === 'audio' && message.audio as audio">
+              <audio [src]="audio.url" controls preload="metadata"></audio>
+              <small>Glasovna poruka · {{ formatAudioDuration(audio.durationSec) }}</small>
+            </div>
             <div class="message-footer">
               <div class="reaction-summary" *ngIf="getReactionSummary(message.id).length > 0">
                 <span class="reaction-chip" *ngFor="let reaction of getReactionSummary(message.id)">{{ reaction.emoji }} {{ reaction.count }}</span>
               </div>
-              <span class="delivery-status" [attr.data-status]="message.status">{{ getMessageStatus(message.id) }}</span>
+              <span class="delivery-status" *ngIf="message.senderId === user.id" [attr.data-status]="message.status">{{ getMessageStatus(message.id) }}</span>
             </div>
-            <div class="reaction-bar">
+            <div class="reaction-bar" *ngIf="message.senderId !== user.id">
               <button class="reaction-btn" type="button" *ngFor="let emoji of emojiPalette" (click)="reactToMessage(message.id, emoji)">{{ emoji }}</button>
             </div>
           </div>
@@ -69,8 +72,10 @@
       </div>
 
       <form class="composer" [formGroup]="messageForm" (ngSubmit)="sendMessage()">
-        <input formControlName="text" placeholder="Napiši poruku...">
-        <button class="primary" type="submit">Pošalji</button>
+        <div class="composer-box">
+          <textarea #composerInput class="composer-input" rows="1" formControlName="text" (input)="onComposerInput($event)" (keydown)="onComposerKeydown($event)" placeholder="Napiši poruku..."></textarea>
+          <button class="primary composer-send" type="submit">Pošalji</button>
+        </div>
       </form>
     </ng-container>
 

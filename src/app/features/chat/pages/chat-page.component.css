@@ -34,6 +34,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
+  flex-wrap: wrap;
+  padding-block: 16px;
 }
 
 .hero-copy h2,
@@ -67,7 +69,7 @@
   background: rgba(255, 255, 255, 0.74);
   display: grid;
   gap: 4px;
-  min-width: 240px;
+  min-width: 220px;
 }
 
 .workspace-grid {
@@ -267,17 +269,17 @@ select:focus {
 }
 
 .message-bubble {
-  max-width: min(680px, 86%);
-  padding: 14px 16px;
-  border-radius: 22px 22px 22px 8px;
+  max-width: min(620px, 82%);
+  padding: 12px 14px;
+  border-radius: 20px 20px 20px 8px;
   border: 1px solid rgba(37, 211, 102, 0.12);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 8px 22px rgba(16, 24, 40, 0.06);
 }
 
 .message-row.mine .message-bubble {
-  border-radius: 22px 22px 8px 22px;
-  background: linear-gradient(135deg, rgba(37, 211, 102, 0.12), rgba(18, 140, 126, 0.1));
+  border-radius: 20px 20px 8px 20px;
+  background: linear-gradient(135deg, rgba(37, 211, 102, 0.1), rgba(18, 140, 126, 0.08));
 }
 
 .message-topline,
@@ -295,8 +297,8 @@ select:focus {
 }
 
 .message-bubble p {
-  margin: 10px 0;
-  line-height: 1.5;
+  margin: 8px 0;
+  line-height: 1.45;
 }
 
 .reaction-summary {
@@ -314,7 +316,7 @@ select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .reaction-btn,
@@ -371,6 +373,21 @@ select:focus {
   display: grid;
   grid-template-columns: 1.2fr 1fr 0.8fr;
   gap: 18px;
+}
+
+.profile-footer-note {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.profile-footer-note span {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .inner-panel {
@@ -481,5 +498,13 @@ select:focus {
 
   .message-bubble {
     max-width: 100%;
+  }
+
+  .hero-card {
+    min-width: 0;
+  }
+
+  .profile-footer-note {
+    justify-content: flex-start;
   }
 }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { ChatStoreService } from '../../../core/services/chat-store.service';
 
 @Component({
   selector: 'app-login-page',
@@ -14,6 +15,7 @@ import { AuthService } from '../../../core/services/auth.service';
 export class LoginPageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly chat = inject(ChatStoreService);
   private readonly router = inject(Router);
 
   readonly mode = signal<'login' | 'register'>('login');
@@ -57,6 +59,7 @@ export class LoginPageComponent {
       return;
     }
 
+    this.chat.clearActiveConversation();
     this.router.navigateByUrl(result.role === 'admin' ? '/admin' : '/chat/messages');
   }
 

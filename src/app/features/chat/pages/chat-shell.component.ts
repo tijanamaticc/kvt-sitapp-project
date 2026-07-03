@@ -21,20 +21,11 @@ export class ChatShellComponent {
 
   constructor() {
     this.chat.initialize(this.auth.users());
-    const me = this.auth.currentUser();
-    // If logged-in user is the administrator, purge leftover conversations
-    if (me && me.username === 'admin') {
-      // keep only admin and tijanam (usernames)
-      try {
-        this.chat.purgeConversationsExcept(['admin', 'tijanam']);
-      } catch (e) {
-        // ignore
-      }
-    }
+    void this.auth.refreshUsersFromServer();
   }
 
   logout(): void {
-    this.auth.logout();
+    this.chat.logout();
     this.router.navigateByUrl('/login');
   }
 

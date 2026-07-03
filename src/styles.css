@@ -29,7 +29,7 @@ html, body {
 
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at top left, rgba(143, 215, 255, 0.28), transparent 32%),

@@ -31,14 +31,12 @@
     </label>
   </div>
 
-    <div class="contact-list">
+  <div class="contact-list">
     <button class="contact-card" type="button" *ngFor="let candidate of chat.filteredUsers()" (click)="openContact(candidate.id)" [class.active]="chat.activeConversation()?.memberIds?.includes(candidate.id)">
       <img class="avatar" [src]="getAvatar(candidate.profile.avatarUrl)" alt="avatar">
       <div class="contact-copy">
-        <div class="contact-line">
-          <strong>{{ candidate.profile.displayName }}</strong>
-          <span>{{ candidate.profile.lastActivityAt ? (candidate.profile.lastActivityAt | date:'short') : 'nema aktivnosti' }}</span>
-        </div>
+        <span class="contact-time">{{ candidate.profile.lastActivityAt ? (candidate.profile.lastActivityAt | date:'short') : 'nema aktivnosti' }}</span>
+        <strong>{{ candidate.profile.displayName }}</strong>
         <p>{{ candidate.username }} · {{ candidate.phone }}</p>
         <small>{{ candidate.profile.bio || 'Nema biografije' }}</small>
       </div>

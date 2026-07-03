@@ -21,6 +21,7 @@ export class ChatContactsPageComponent {
 
   constructor() {
     this.chat.initialize(this.auth.users());
+    void this.auth.refreshUsersFromServer();
   }
 
   setUserSearch(value: string): void {

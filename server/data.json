@@ -1,56 +1,39 @@
 {
   "users": [
     {
-      "id": "2258ffec-3c71-4f3c-8b2b-56f52038a51f",
-      "username": "a",
+      "id": "a098f7f5-09f8-45e1-b714-9e03c76a74f9",
+      "username": "andjela",
       "email": "tijanamtc.7@gmail.com",
-      "phone": "+3817653456",
-      "password": "123456",
-      "role": "student",
-      "accountStatus": "pending",
-      "profile": {
-        "firstName": "a",
-        "lastName": "a",
-        "displayName": "a a",
-        "bio": "",
-        "status": "",
-        "avatarUrl": "/uploads/537c4905-779d-491e-af98-8851858e847f.png"
-      }
-    },
-    {
-      "id": "ed5da0ba-dcdb-4010-8a0a-c26fa6d3eced",
-      "username": "tijanam",
-      "email": "tijanamtc.7@gmail.com",
-      "phone": "+3817653456",
-      "password": "1234567",
+      "phone": "+30164765675",
+      "password": "andjela123",
       "role": "student",
       "accountStatus": "approved",
       "profile": {
-        "firstName": "Tijana",
+        "firstName": "Andjela",
         "lastName": "Matic",
-        "displayName": "Tijana Matic",
-        "bio": "komunikativna",
-        "status": "Dostupna",
-        "avatarUrl": "http://localhost:3333/uploads/13a3d68f-a7fc-4451-87cf-cb270fb049e3.png",
-        "lastActivityAt": "2026-05-21T18:19:01.791Z"
+        "displayName": "Andjela Matic",
+        "bio": "uu",
+        "status": "Zauzet",
+        "avatarUrl": "data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A//www.w3.org/2000/svg%22 viewBox%3D%220 0 120 120%22%3E%3Crect width%3D%22120%22 height%3D%22120%22 fill%3D%22%23e7f8ef%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2238%22 r%3D%2230%22 fill%3D%22%2325d366%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2262%22 r%3D%2216%22 fill%3D%22%23ffffff%22/%3E%3Crect x%3D%2242%22 y%3D%2278%22 width%3D%2236%22 height%3D%2210%22 rx%3D%225%22 fill%3D%22%23ffffff%22/%3E%3C/svg%3E",
+        "lastActivityAt": "2026-07-03T14:38:00.796Z"
       }
     },
     {
-      "id": "71c8cc9e-9c8e-4d29-bce6-15817054cf75",
-      "username": "live_test2",
+      "id": "0f8099af-11fe-4af0-985c-bc0c73766245",
+      "username": "tea",
       "email": "tijanamtc.7@gmail.com",
-      "phone": "+381600000011",
-      "password": "livepass2",
+      "phone": "+381543212345",
+      "password": "tea1234",
       "role": "student",
       "accountStatus": "approved",
       "profile": {
-        "firstName": "Live",
-        "lastName": "Test",
-        "displayName": "Live Test 2",
-        "bio": "",
-        "status": "",
-        "avatarUrl": null,
-        "lastActivityAt": "2026-05-21T18:03:11.295Z"
+        "firstName": "Teodoraa",
+        "lastName": "Cerovac",
+        "displayName": "Teodoraa Cerovac",
+        "bio": "aaaa",
+        "status": "Dostupna",
+        "avatarUrl": "data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A//www.w3.org/2000/svg%22 viewBox%3D%220 0 120 120%22%3E%3Crect width%3D%22120%22 height%3D%22120%22 fill%3D%22%23e7f8ef%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2238%22 r%3D%2230%22 fill%3D%22%2325d366%22/%3E%3Ccircle cx%3D%2260%22 cy%3D%2262%22 r%3D%2216%22 fill%3D%22%23ffffff%22/%3E%3Crect x%3D%2242%22 y%3D%2278%22 width%3D%2236%22 height%3D%2210%22 rx%3D%225%22 fill%3D%22%23ffffff%22/%3E%3C/svg%3E",
+        "lastActivityAt": "2026-07-03T16:52:46.349Z"
       }
     },
     {
@@ -60,6 +43,7 @@
       "phone": "+381600000000",
       "password": "admin123",
       "role": "admin",
+      "accountStatus": "approved",
       "profile": {
         "firstName": "System",
         "lastName": "Admin",
@@ -67,27 +51,8 @@
         "bio": "Predefinisani administratorski nalog",
         "status": "Online",
         "avatarUrl": null,
-        "lastActivityAt": "2026-05-20T19:14:31.097Z"
-      },
-      "accountStatus": "approved"
-    },
-    {
-      "id": "u-test-1",
-      "username": "testuser",
-      "email": "testuser@example.com",
-      "phone": "+381651234567",
-      "password": "test123",
-      "role": "student",
-      "profile": {
-        "firstName": "Test",
-        "lastName": "User",
-        "displayName": "Test User",
-        "bio": "Privremeni test nalog",
-        "status": "Offline",
-        "avatarUrl": null,
-        "lastActivityAt": "2026-05-20T21:58:23.895Z"
-      },
-      "accountStatus": "approved"
+        "lastActivityAt": null
+      }
     }
   ],
   "conversations": [],

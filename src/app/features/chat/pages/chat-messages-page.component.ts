@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, AfterViewInit, ViewChild, ElementRef, effect } from '@angular/core';
+import { Component, inject, ViewChild, ElementRef, effect } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { ChatStoreService } from '../../../core/services/chat-store.service';
@@ -27,6 +27,7 @@ export class ChatMessagesPageComponent {
   });
 
   @ViewChild('messageList', { static: false }) private messageListRef?: ElementRef<HTMLElement>;
+  @ViewChild('composerInput', { static: false }) private composerInputRef?: ElementRef<HTMLTextAreaElement>;
 
   constructor() {
     this.chat.initialize(this.auth.users());
@@ -52,12 +53,37 @@ export class ChatMessagesPageComponent {
     const text = this.messageForm.value.text ?? '';
     this.chat.sendMessage(text);
     this.messageForm.reset({ text: '' });
+    const composer = this.composerInputRef?.nativeElement;
+    if (composer) {
+      composer.style.height = '36px';
+    }
     // ensure composer reset and scroll
     setTimeout(() => this.scrollToBottom(), 50);
   }
 
   reactToMessage(messageId: string, emoji: string): void {
+    const currentUserId = this.currentUser()?.id;
+    const message = this.chat.messages().find((item) => item.id === messageId);
+    if (!message || !currentUserId || message.senderId === currentUserId) {
+      return;
+    }
+
     this.chat.reactToMessage(messageId, emoji);
+  }
+
+  onComposerKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    this.sendMessage();
+  }
+
+  onComposerInput(event: Event): void {
+    const target = event.target as HTMLTextAreaElement;
+    target.style.height = 'auto';
+    target.style.height = `${Math.min(target.scrollHeight, 180)}px`;
   }
 
   setConversationSearch(value: string): void {
@@ -69,13 +95,26 @@ export class ChatMessagesPageComponent {
   }
 
   getConversationTitle(conversationId: string): string {
-    return this.chat.conversations().find((item) => item.id === conversationId)?.title || 'Razgovor';
+    const conversation = this.chat.conversations().find((item) => item.id === conversationId);
+    if (!conversation) {
+      return 'Razgovor';
+    }
+
+    if (conversation.kind === 'direct') {
+      return this.chat.getConversationPartner(conversation)?.profile.displayName || conversation.title || 'Razgovor';
+    }
+
+    return conversation.title || 'Razgovor';
   }
 
   getConversationSubtitle(conversationId: string): string {
     const conversation = this.chat.conversations().find((item) => item.id === conversationId);
     if (!conversation) {
       return '';
+    }
+
+    if (conversation.kind === 'direct') {
+      return this.chat.getConversationPartner(conversation)?.profile.status || 'Direktan razgovor';
     }
 
     return conversation.description || (conversation.kind === 'group' ? `${conversation.memberIds.length} članova` : 'Direktan razgovor');
@@ -94,7 +133,7 @@ export class ChatMessagesPageComponent {
 
   getConversationAvatar(conversationId: string): string {
     const conversation = this.chat.conversations().find((item) => item.id === conversationId);
-    const partner = conversation ? this.chat.getConversationPartner(conversation) : null;
+    const partner = conversation && conversation.kind === 'direct' ? this.chat.getConversationPartner(conversation) : null;
     const avatar = partner?.profile.avatarUrl;
     if (avatar && avatar.startsWith('/uploads/')) {
       return `${AuthService.SERVER_ORIGIN}${avatar}`;
@@ -111,6 +150,18 @@ export class ChatMessagesPageComponent {
   getReactionSummary(messageId: string): Array<{ emoji: string; count: number }> {
     const message = this.chat.messages().find((item) => item.id === messageId);
     return message ? this.chat.getReactionSummary(message) : [];
+  }
+
+  formatAudioDuration(seconds?: number): string {
+    if (!seconds) {
+      return '0:00';
+    }
+
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60)
+      .toString()
+      .padStart(2, '0');
+    return `${mins}:${secs}`;
   }
 
   private scrollToBottom(): void {

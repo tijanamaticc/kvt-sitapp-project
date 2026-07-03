@@ -1,5 +1,11 @@
 export type MessageStatus = 'sent' | 'delivered' | 'read';
-export type MessageKind = 'text';
+export type MessageKind = 'text' | 'audio';
+
+export interface AudioPayload {
+  url: string;
+  mimeType: string;
+  durationSec: number;
+}
 
 export interface MessageReaction {
   emoji: string;
@@ -14,6 +20,7 @@ export interface Message {
   createdAt: string;
   status: MessageStatus;
   kind: MessageKind;
+  audio?: AudioPayload;
   deliveredAt?: string | null;
   readAt?: string | null;
   reactions?: MessageReaction[];
